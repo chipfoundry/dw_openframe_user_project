@@ -46,8 +46,8 @@ You implement your design and connect it directly to the GPIOs through the pins 
 
 | Path | Description |
 | :--- | :--- |
-| `openlane/` | LibreLane configurations: one directory per macro, plus `double_wide_openframe_project_wrapper/`. |
-| `openlane/double_wide_openframe_project_wrapper/fixed_dont_change/` | Wrapper pin template from the harness. Do not edit. |
+| `openlane/double_wide_openframe_project_wrapper/` | The one LibreLane 3 config for the whole (flat) wrapper design. `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
+| `openlane/double_wide_openframe_project_wrapper/pin_template.def` | Wrapper pin template from the harness. Do not edit. |
 | `verilog/rtl/` | RTL sources. |
 | `verilog/gl/` | Gate-level netlists written by `cf harden`. |
 | `verilog/dv/cocotb/` | cocotb tests run by `cf verify`. |
@@ -66,9 +66,9 @@ The template ships a small, fully hardened example so every flow step works out 
 | 13:2 | `count[11:0]` (outputs) |
 | 62:14 | unused, configured as analog (high impedance) |
 
-* `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is a hardened macro; its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
-* `double_wide_openframe_project_wrapper` instantiates the macro and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants.
-* `dw_vccd1_connection` / `dw_vssd1_connection` are metal-only macros joining the east-edge `vccd1`/`vssd1` pins to the wrapper core ring. Keep them in your wrapper.
+* `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is a plain RTL submodule; its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
+* `double_wide_openframe_project_wrapper` instantiates it directly and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants.
+* There is only one `openlane/` design: the whole wrapper (GPIO config + your logic) is synthesized and hardened flat with LibreLane 3. LibreLane's own power-grid generator reaches the padframe-aligned `vccd1`/`vssd1` pins directly, so no separate macro or metal-only "connection" cell is needed to bridge power to the pads.
 
 ---
 
@@ -115,44 +115,56 @@ This installs, inside the project:
 
 ### Hardening the Design
 
-#### Macro hardening
-Each macro has a directory under `openlane/` with its `config.json`:
+#### One flat design, hardened with LibreLane 3
 
-```bash
-cf harden --list
-cf harden user_proj_counter
-```
+Unlike `analog`/`digital`/`openframe` projects, `double_wide` has a single
+`openlane/` design: the whole wrapper (your logic + GPIO pad configuration)
+is synthesized and placed-and-routed together, the same way the upstream
+Double-Wide OpenFrame template is built. `cf harden` detects the
+`double_wide` project type and automatically runs **LibreLane 3** for it
+(every other project type keeps using the standard LibreLane/OpenLane 2
+version cf-cli normally pins) — LibreLane 3's power-grid generator reaches
+the padframe-aligned `vccd1`/`vssd1` pins directly, so there is no separate
+macro to harden and no metal-only "connection" cell bridging power to the
+pads.
 
-Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`, `verilog/gl/` and `signoff/`.
-
-Each design has its own constraints file (`openlane/<design>/<design>.sdc`, set as `PNR_SDC_FILE` and `SIGNOFF_SDC_FILE`). Inputs fed by GPIO pads are modelled with the characterized pad input transition, and asynchronous reset inputs are false paths. Adapt the clock, I/O delays and false paths to your design.
-
-#### Integration
-Instantiate your macros in `verilog/rtl/double_wide_openframe_project_wrapper.v`, then update `openlane/double_wide_openframe_project_wrapper/`:
-
-* `config.json` → `MACROS`: one entry per macro with its `gds`, `lef`, `nl`, per-corner `lib`/`spef` views and the placement of each instance. Keep the two connection macros at their given locations.
-* `config.json` → `FP_PDN_MACRO_HOOKS`: connect each macro instance to `vccd1`/`vssd1`.
-* `double_wide_openframe_project_wrapper.sdc`: clocks and constraints seen at the wrapper boundary.
-
-Also add your macros to `verilog/includes/` and to `LVS_VERILOG_FILES` in `lvs/double_wide_openframe_project_wrapper/lvs_config.json`.
-
-#### Wrapper hardening
+Add your logic as plain RTL submodules instantiated from
+`verilog/rtl/double_wide_openframe_project_wrapper.v` (see
+`user_proj_counter.v` for an example), list every new file in
+`openlane/double_wide_openframe_project_wrapper/config.json` →
+`VERILOG_FILES` and in `verilog/includes/includes.rtl.openframe_user_project`,
+then harden the whole wrapper:
 
 ```bash
 cf harden double_wide_openframe_project_wrapper
 ```
 
-The wrapper is elaboration-only (no standard cells at the top level): it routes macro pins to the fixed boundary pins and builds the `vccd1`/`vssd1` core ring and straps. Because nothing is buffered at the top level, place macros so their pins sit close to the pads they connect to, and protect macro inputs against wrapper-level antenna effects (the example uses `DIODE_ON_PORTS: "in"`).
+Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`,
+`verilog/gl/` and `signoff/`.
+
+The wrapper's constraints file
+(`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`,
+set as `PNR_SDC_FILE` and `SIGNOFF_SDC_FILE`) models GPIO-driven inputs with
+the characterized pad input transition and treats asynchronous reset inputs
+as false paths. Adapt the clock, I/O delays and false paths to your design.
+Protect your logic's inputs against wrapper-level antenna effects (the
+example uses `DIODE_ON_PORTS: "in"`).
+
+Magic/KLayout DRC and Netgen LVS are disabled during `cf harden` itself
+(`meta.substituting_steps` in `config.json`) — full DRC/LVS signoff happens
+with `cf precheck`, same as every other project type.
 
 ### Important Notes
 
 **Power:**
-* Connect digital logic to **`vccd1` / `vssd1`**; macros are hooked to the wrapper grid through `FP_PDN_MACRO_HOOKS`.
-* The east-edge `vccd1`/`vssd1` pins reach the ring through `dw_vccd1_connection` / `dw_vssd1_connection`.
+* Connect digital logic to **`vccd1` / `vssd1`**. LibreLane's `GeneratePDN`
+  step builds the grid and (via `PDN_ENABLE_PINS`, on by default) promotes
+  the stripes that reach the core/die boundary into `vccd1`/`vssd1` block
+  pins aligned with the padframe automatically.
 
 **Wrapper contract:**
 * The top module must be named `double_wide_openframe_project_wrapper`, with the port list of `caravel/verilog/rtl/__double_wide_openframe_project_wrapper.v`.
-* The footprint (6754.63 × 4766.63 µm) and boundary pins are fixed by `fixed_dont_change/double_wide_openframe_project_wrapper.def`. `cf precheck` XORs the boundary against the harness golden wrapper.
+* The footprint (6754.63 × 4766.63 µm) and boundary pins are fixed by `pin_template.def`. `cf precheck` XORs the boundary against the harness golden wrapper.
 
 **GPIO configuration:**
 * Every pad's `dm`, `inp_dis`, `oeb` and analog controls must be driven. Use `CF_gpio_config` (or loopback constants) for every GPIO, including unused ones. `cf gpio-config` does not apply to double-wide projects.
@@ -192,7 +204,7 @@ cf precheck --magic-drc          # include the optional Magic DRC
 - [ ] Top-level macro is named `double_wide_openframe_project_wrapper`.
 - [ ] `cf verify --all` and `cf verify --all --sim gl` pass.
 - [ ] All macros and the wrapper are hardened with `cf harden` and their views are committed.
-- [ ] The wrapper keeps the fixed pin template and the `vccd1`/`vssd1` connection macros.
+- [ ] The wrapper keeps the fixed pin template (`pin_template.def`) and the padframe-matching `DIE_AREA`/`CORE_AREA`.
 - [ ] Every GPIO is configured (including unused pads).
 - [ ] `cf precheck` passes.
 - [ ] This README describes your design.

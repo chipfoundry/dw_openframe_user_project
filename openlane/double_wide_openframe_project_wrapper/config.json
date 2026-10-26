@@ -1,172 +1,86 @@
 {
+    "//": "Double-wide openframe user project wrapper hardening (LibreLane 3).",
+    "//structure": "openframe_user_project-style layout: openlane/<macro>/config.json.",
+    "//footprint": "Same DESIGN_NAME / DIE_AREA / power pins as the padframe's empty",
+    "//footprint2": "wrapper, and the same pad-aligned pin template, so the hardened GDS",
+    "//footprint3": "cell-swaps cleanly into the ../dw_openframe padframe frame.",
+    "//flat": "user_proj_counter is a plain RTL submodule here, not a MACROS entry:",
+    "//flat2": "LibreLane 3 synthesizes it flat with the wrapper and self-generates a",
+    "//flat3": "PDN that reaches the pad-aligned power pins directly (PDN_ENABLE_PINS,",
+    "//flat4": "the default), so no bridging 'connection' macros are needed either.",
+    "//signoff": "DRC/LVS signoff is deferred to `cf precheck` (golden sky130 rules,",
+    "//signoff2": "same as every other project type); Magic/KLayout DRC and Netgen LVS",
+    "//signoff3": "are disabled here via substituting_steps (no RUN_ gate exists for",
+    "//signoff4": "them in LibreLane 3). The in-flow Netgen.LVS also false-flags here:",
+    "//signoff5": "GRT_REPAIR_ANTENNAS inserts extra diodes into the routed layout after",
+    "//signoff6": "the comparison netlist is written, so some nets end up with more",
+    "//signoff7": "diodes in the GDS than in the netlist LVS compares against.",
+
     "DESIGN_NAME": "double_wide_openframe_project_wrapper",
-    "VERILOG_DEFINES": [
-        "PnR"
-    ],
     "VERILOG_FILES": [
         "dir::../../verilog/rtl/CF_gpio_config.v",
+        "dir::../../verilog/rtl/user_proj_counter.v",
         "dir::../../verilog/rtl/double_wide_openframe_project_wrapper.v"
     ],
-    "MACROS": {
-        "user_proj_counter": {
-            "gds": [
-                "dir::../../gds/user_proj_counter.gds"
-            ],
-            "lef": [
-                "dir::../../lef/user_proj_counter.lef"
-            ],
-            "nl": [
-                "dir::../../verilog/gl/user_proj_counter.v"
-            ],
-            "spef": {
-                "min_*": [
-                    "dir::../../spef/multicorner/user_proj_counter.min.spef"
-                ],
-                "nom_*": [
-                    "dir::../../spef/multicorner/user_proj_counter.nom.spef"
-                ],
-                "max_*": [
-                    "dir::../../spef/multicorner/user_proj_counter.max.spef"
-                ]
-            },
-            "lib": {
-                "max_ff_n40C_1v95": [
-                    "dir::../../lib/multicorner/user_proj_counter__max_ff_n40C_1v95.lib"
-                ],
-                "max_ss_100C_1v60": [
-                    "dir::../../lib/multicorner/user_proj_counter__max_ss_100C_1v60.lib"
-                ],
-                "max_tt_025C_1v80": [
-                    "dir::../../lib/multicorner/user_proj_counter__max_tt_025C_1v80.lib"
-                ],
-                "min_ff_n40C_1v95": [
-                    "dir::../../lib/multicorner/user_proj_counter__min_ff_n40C_1v95.lib"
-                ],
-                "min_ss_100C_1v60": [
-                    "dir::../../lib/multicorner/user_proj_counter__min_ss_100C_1v60.lib"
-                ],
-                "min_tt_025C_1v80": [
-                    "dir::../../lib/multicorner/user_proj_counter__min_tt_025C_1v80.lib"
-                ],
-                "nom_ff_n40C_1v95": [
-                    "dir::../../lib/multicorner/user_proj_counter__nom_ff_n40C_1v95.lib"
-                ],
-                "nom_ss_100C_1v60": [
-                    "dir::../../lib/multicorner/user_proj_counter__nom_ss_100C_1v60.lib"
-                ],
-                "nom_tt_025C_1v80": [
-                    "dir::../../lib/multicorner/user_proj_counter__nom_tt_025C_1v80.lib"
-                ]
-            },
-            "instances": {
-                "mprj": {
-                    "location": [
-                        150,
-                        500
-                    ],
-                    "orientation": "N"
-                }
-            }
-        },
-        "dw_vccd1_connection": {
-            "gds": [
-                "dir::../../gds/dw_vccd1_connection.gds"
-            ],
-            "lef": [
-                "dir::../../lef/dw_vccd1_connection.lef"
-            ],
-            "nl": [
-                "dir::../../verilog/gl/dw_vccd1_connection.v"
-            ],
-            "instances": {
-                "dw_vccd1_connection": {
-                    "location": [
-                        6710.515,
-                        4322.045
-                    ],
-                    "orientation": "N"
-                }
-            }
-        },
-        "dw_vssd1_connection": {
-            "gds": [
-                "dir::../../gds/dw_vssd1_connection.gds"
-            ],
-            "lef": [
-                "dir::../../lef/dw_vssd1_connection.lef"
-            ],
-            "nl": [
-                "dir::../../verilog/gl/dw_vssd1_connection.v"
-            ],
-            "instances": {
-                "dw_vssd1_connection": {
-                    "location": [
-                        6710.515,
-                        2083.05
-                    ],
-                    "orientation": "N"
-                }
-            }
+
+    "meta": {
+        "version": 3,
+        "flow": "Classic",
+        "substituting_steps": {
+            "Magic.DRC": null,
+            "Checker.MagicDRC": null,
+            "KLayout.DRC": null,
+            "Checker.KLayoutDRC": null,
+            "Checker.YosysUnmappedCells": null,
+            "Netgen.LVS": null,
+            "Checker.LVS": null
         }
     },
+
+    "CLOCK_PORT": "gpio_in[0]",
+    "CLOCK_PERIOD": 25,
+    "RUN_CTS": true,
+
     "PNR_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
     "SIGNOFF_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
-    "IGNORE_DISCONNECTED_MODULES": [
-        "dw_vccd1_connection",
-        "dw_vssd1_connection"
-    ],
-    "MAX_TRANSITION_CONSTRAINT": 1.0,
-    "ERROR_ON_NL_ASSIGN_STATEMENTS": false,
-    "QUIT_ON_SYNTH_CHECKS": false,
-    "SYNTH_ELABORATE_ONLY": true,
-    "SYNTH_USE_PG_PINS_DEFINES": "USE_POWER_PINS",
-    "PL_RANDOM_GLB_PLACEMENT": true,
-    "PL_RESIZER_DESIGN_OPTIMIZATIONS": false,
-    "PL_RESIZER_TIMING_OPTIMIZATIONS": false,
-    "GLB_RESIZER_TIMING_OPTIMIZATIONS": false,
-    "GLB_RESIZER_DESIGN_OPTIMIZATIONS": false,
-    "PL_RESIZER_BUFFER_INPUT_PORTS": false,
-    "RUN_CTS": false,
-    "FP_PDN_ENABLE_RAILS": false,
-    "GRT_REPAIR_ANTENNAS": false,
-    "RUN_HEURISTIC_DIODE_INSERTION": false,
-    "RUN_FILL_INSERTION": false,
-    "RUN_TAP_DECAP_INSERTION": false,
-    "FP_PDN_CHECK_NODES": false,
-    "FP_PDN_VPITCH": 40,
-    "FP_PDN_HPITCH": 40,
-    "FP_PDN_VOFFSET": 18.43,
-    "FP_PDN_HOFFSET": 22.83,
-    "FP_PDN_VWIDTH": 6.4,
-    "FP_PDN_HWIDTH": 6.4,
-    "FP_PDN_HSPACING": 3.2,
-    "FP_PDN_VSPACING": 3.2,
-    "FP_PDN_CORE_RING": true,
-    "FP_PDN_CORE_RING_VWIDTH": 20,
-    "FP_PDN_CORE_RING_HWIDTH": 20,
-    "FP_PDN_CORE_RING_VOFFSET": -4,
-    "FP_PDN_CORE_RING_HOFFSET": -4,
-    "FP_PDN_CORE_RING_VSPACING": 2.4,
-    "FP_PDN_CORE_RING_HSPACING": 2.4,
-    "FP_PDN_MACRO_HOOKS": "mprj vccd1 vssd1 vccd1 vssd1",
-    "FP_PDN_CFG": "dir::pdn_cfg.tcl",
-    "VDD_NETS": [
-        "vccd1"
-    ],
-    "GND_NETS": [
-        "vssd1"
-    ],
-    "MAGIC_ZEROIZE_ORIGIN": false,
+
     "FP_SIZING": "absolute",
-    "DIE_AREA": "0 0 6754.63 4766.63",
-    "CORE_AREA": "40 40 6714.63 4726.63",
-    "FP_DEF_TEMPLATE": "dir::fixed_dont_change/double_wide_openframe_project_wrapper.def",
-    "FP_TEMPLATE_COPY_POWER_PINS": true,
+    "DIE_AREA": [0, 0, 6754.63, 4766.63],
+    "CORE_AREA": [40, 40, 6714.63, 4726.63],
+
+    "//pin-template": "Fixed, pad-aligned pin locations (shipped from the padframe",
+    "//pin-template2": "generator; keep in sync with ../dw_openframe librelane/wrapper/",
+    "//pin-template3": "pin_template.def) so the wrapper's boundary pins match the frame.",
+    "FP_DEF_TEMPLATE": "dir::pin_template.def",
     "FP_TEMPLATE_MATCH_MODE": "permissive",
-    "RUN_IRDROP_REPORT": false,
-    "RUN_LINTER": false,
-    "RUN_CVC": false,
-    "MAGIC_DEF_LABELS": false,
-    "MAGIC_EXT_USE_GDS": true,
-    "RUN_LVS": false
+
+    "VDD_NETS": ["vccd1", "vccd2", "vccd", "vddio", "vdda", "vdda1", "vdda2"],
+    "GND_NETS": ["vssd1", "vssd2", "vssd", "vssio", "vssa", "vssa1", "vssa2"],
+
+    "PDN_MULTILAYER": true,
+    "PDN_VPITCH": 180,
+    "PDN_HPITCH": 180,
+    "ERROR_ON_PDN_VIOLATIONS": false,
+    "PDN_CORE_RING": false,
+    "RT_MAX_LAYER": "met4",
+
+    "//sparse": "Counter example is tiny vs. the 32 mm^2 die. Skip tap/fill so",
+    "//sparse2": "harden does not insert hundreds of thousands of tap cells, and",
+    "//sparse3": "keep placement density low so the tiny design stays clustered.",
+    "RUN_TAP_ENDCAP_INSERTION": false,
+    "RUN_FILL_INSERTION": false,
+    "PL_TARGET_DENSITY_PCT": 5,
+
+    "MAX_TRANSITION_CONSTRAINT": 1.0,
+    "MAX_FANOUT_CONSTRAINT": 16,
+    "GRT_REPAIR_ANTENNAS": true,
+    "GRT_ANTENNA_ITERS": 10,
+    "DIODE_ON_PORTS": "in",
+
+    "MAGIC_EXT_UNIQUE": "notopports",
+    "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
+
+    "LINTER_DISABLE_WARNINGS": [
+        "DECLFILENAME", "EOFNEWLINE", "PINCONNECTEMPTY", "PINMISSING", "UNUSEDSIGNAL"
+    ]
 }

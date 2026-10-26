@@ -20,9 +20,13 @@ master reset from the `resetb` pad (`resetb_h`, `resetb_l`) and per-pad
 
 The wrapper keeps the OpenFrame multi-domain port names: `vccd1`/`vssd1`,
 `vccd2`/`vssd2`, `vdda*`/`vssa*`, `vddio`/`vssio`. Digital logic connects to
-**`vccd1`/`vssd1`**. The east-edge `vccd1`/`vssd1` pins reach the wrapper core
-ring through the metal-only `dw_vccd1_connection` / `dw_vssd1_connection`
-macros, which must stay at their configured locations.
+**`vccd1`/`vssd1`**. The wrapper is hardened as a single flat design with
+LibreLane 3 (`openlane/double_wide_openframe_project_wrapper/config.json`,
+`meta.version: 3`): LibreLane's own `OpenROAD.GeneratePDN` step builds the
+power grid and, because `PDN_ENABLE_PINS` is on by default, promotes every
+grid stripe that reaches the core/die boundary straight into a `vccd1`/`vssd1`
+block pin at the padframe-aligned location. No metal-only "connection" macro
+is needed to bridge the grid to the pad pins.
 
 ## Example design
 
@@ -33,22 +37,25 @@ macros, which must stay at their configured locations.
 | 13:2 | `count[11:0]` | output |
 | 62:14 | unused | analog (input buffer off, high impedance) |
 
-`user_proj_counter` resets asynchronously on `rst_n & porb_l & resetb_l` and
-releases reset through a two-flop synchronizer, so the asynchronous pad and
-frame resets cannot cause recovery/removal violations.
+`user_proj_counter` is a plain RTL submodule of the wrapper (synthesized flat,
+not a separate hardened macro). It resets asynchronously on
+`rst_n & porb_l & resetb_l` and releases reset through a two-flop
+synchronizer, so the asynchronous pad and frame resets cannot cause
+recovery/removal violations.
 
 ## Timing constraints
 
-Both LibreLane designs use their own SDC for PnR and signoff
-(`openlane/<design>/<design>.sdc`):
+The wrapper uses its own SDC for PnR and signoff
+(`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`):
 
 * Pad-driven inputs use the characterized pad input transition from the Caravel
   signoff constraints (0.38 ns max / 0.05 ns min) instead of a weak
   standard-cell driver.
-* Reset inputs are false paths (release is re-timed inside the macro).
-* In the wrapper, `gpio_loopback_one/zero` are constants (`set_case_analysis`).
-* The wrapper and the macro share a 1.0 ns max-transition limit (Caravel and
-  OpenFrame sign off the wrapper at 1.5 ns).
+* Reset inputs are false paths (release is re-timed by the internal
+  synchronizer).
+* `gpio_loopback_one/zero` are constants (`set_case_analysis`).
+* 1.0 ns max-transition limit (Caravel and OpenFrame sign off the wrapper at
+  1.5 ns).
 
 ## Verification
 
@@ -64,5 +71,5 @@ the `resetb` pad before reaching the wrapper.
 * XOR: everything outside the 6754.63 × 4766.63 µm user area must match the
   golden empty wrapper.
 * LVS: `lvs/double_wide_openframe_project_wrapper/lvs_config.json` (Magic
-  extraction + Netgen against `verilog/gl/*.v`).
+  extraction + Netgen against `verilog/gl/double_wide_openframe_project_wrapper.v`).
 * OEB: CVC checks the pad configuration of all 63 GPIOs.

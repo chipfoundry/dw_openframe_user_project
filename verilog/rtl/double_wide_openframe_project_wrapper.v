@@ -84,8 +84,6 @@ module double_wide_openframe_project_wrapper (
     inout  [62:0] analog_noesd_io
 );
 
-    // Must match the width user_proj_counter was hardened with; the macro is
-    // instantiated as a black box, so it cannot be overridden here.
     localparam COUNT_WIDTH = 12;
     localparam COUNT_LSB   = 2;
     localparam FIRST_UNUSED = COUNT_LSB + COUNT_WIDTH;
@@ -94,6 +92,11 @@ module double_wide_openframe_project_wrapper (
     wire                   rst_n;
     wire [COUNT_WIDTH-1:0] count;
 
+    // user_proj_counter is a plain RTL submodule, synthesized flat together
+    // with the wrapper (no separate hardened macro/GDS). LibreLane's PDN
+    // generator stitches the wrapper's own power grid straight to the
+    // vccd1/vssd1 pad pins (see Wrapper.AddPowerEdgePorts in config.json),
+    // so no metal-only bridge cells are needed either.
     user_proj_counter mprj (
 `ifdef USE_POWER_PINS
         .vccd1(vccd1),
@@ -105,11 +108,6 @@ module double_wide_openframe_project_wrapper (
         .resetb_l(resetb_l),
         .count(count)
     );
-
-    // Metal-only bridges from the east-edge vccd1/vssd1 pad pins to the
-    // core power ring.
-    (* keep *) dw_vccd1_connection dw_vccd1_connection ();
-    (* keep *) dw_vssd1_connection dw_vssd1_connection ();
 
     // CF_gpio_config modes
     // 0: analog
