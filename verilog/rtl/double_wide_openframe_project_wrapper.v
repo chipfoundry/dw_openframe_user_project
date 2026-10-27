@@ -92,11 +92,14 @@ module double_wide_openframe_project_wrapper (
     wire                   rst_n;
     wire [COUNT_WIDTH-1:0] count;
 
-    // user_proj_counter is a plain RTL submodule, synthesized flat together
-    // with the wrapper (no separate hardened macro/GDS). LibreLane's PDN
-    // generator stitches the wrapper's own power grid straight to the
-    // vccd1/vssd1 pad pins (see Wrapper.AddPowerEdgePorts in config.json),
-    // so no metal-only bridge cells are needed either.
+    // user_proj_counter is hardened as its own macro (see
+    // openlane/user_proj_counter/) and placed into this wrapper via the
+    // MACROS entry in config.json, the same way openframe_project_wrapper
+    // places user_proj_timer and user_project_wrapper places
+    // user_proj_example. This instantiation is a blackbox stub for
+    // synthesis (EXTRA_VERILOG_MODELS reads the macro's hardened
+    // gate-level netlist); the wrapper itself is SYNTH_ELABORATE_ONLY and
+    // carries no standard cells of its own.
     user_proj_counter mprj (
 `ifdef USE_POWER_PINS
         .vccd1(vccd1),

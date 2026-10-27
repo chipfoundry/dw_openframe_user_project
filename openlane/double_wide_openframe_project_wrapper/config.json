@@ -4,24 +4,58 @@
     "//footprint": "Same DESIGN_NAME / DIE_AREA / power pins as the padframe's empty",
     "//footprint2": "wrapper, and the same pad-aligned pin template, so the hardened GDS",
     "//footprint3": "cell-swaps cleanly into the ../dw_openframe padframe frame.",
-    "//flat": "user_proj_counter is a plain RTL submodule here, not a MACROS entry:",
-    "//flat2": "LibreLane 3 synthesizes it flat with the wrapper and self-generates a",
-    "//flat3": "PDN that reaches the pad-aligned power pins directly (PDN_ENABLE_PINS,",
-    "//flat4": "the default), so no bridging 'connection' macros are needed either.",
+
+    "//macro": "user_proj_counter is its own hardened macro (openlane/user_proj_counter/),",
+    "//macro2": "the same macro/wrapper split that openframe_project_wrapper uses for",
+    "//macro3": "user_proj_timer and user_project_wrapper uses for user_proj_example.",
+    "//macro4": "This wrapper carries no standard cells of its own: CF_gpio_config's",
+    "//macro5": "MODE parameter is resolved at elaborate time to plain wiring (see",
+    "//macro6": "verilog/rtl/CF_gpio_config.v), so SYNTH_ELABORATE_ONLY is safe/correct",
+    "//macro7": "and every synthesis/CTS/tap/fill/antenna knob below is off, matching",
+    "//macro8": "the reference templates. LibreLane 3's native PDN generator still",
+    "//macro9": "reaches the pad-aligned power pins directly (PDN_ENABLE_PINS, the",
+    "//macro10": "default) and stitches the counter macro's power pins into that same",
+    "//macro11": "grid via PDN_MACRO_CONNECTIONS, so no bridging 'connection' macros",
+    "//macro12": "are needed either.",
+
     "//signoff": "DRC/LVS signoff is deferred to `cf precheck` (golden sky130 rules,",
-    "//signoff2": "same as every other project type); Magic/KLayout DRC and Netgen LVS",
-    "//signoff3": "are disabled here via substituting_steps (no RUN_ gate exists for",
-    "//signoff4": "them in LibreLane 3). The in-flow Netgen.LVS also false-flags here:",
-    "//signoff5": "GRT_REPAIR_ANTENNAS inserts extra diodes into the routed layout after",
-    "//signoff6": "the comparison netlist is written, so some nets end up with more",
-    "//signoff7": "diodes in the GDS than in the netlist LVS compares against.",
+    "//signoff2": "same as every other project type, and the only place the padframe +",
+    "//signoff3": "wrapper + macro are assembled together); Magic/KLayout DRC and",
+    "//signoff4": "Netgen LVS are disabled here via substituting_steps (no RUN_ gate",
+    "//signoff5": "exists for them in LibreLane 3), matching openframe_project_wrapper's",
+    "//signoff6": "RUN_LVS/RUN_CVC: 0 at the wrapper level.",
 
     "DESIGN_NAME": "double_wide_openframe_project_wrapper",
     "VERILOG_FILES": [
         "dir::../../verilog/rtl/CF_gpio_config.v",
-        "dir::../../verilog/rtl/user_proj_counter.v",
         "dir::../../verilog/rtl/double_wide_openframe_project_wrapper.v"
     ],
+    "EXTRA_VERILOG_MODELS": [
+        "dir::../../verilog/gl/user_proj_counter.v"
+    ],
+
+    "MACROS": {
+        "user_proj_counter": {
+            "gds": ["dir::../../gds/user_proj_counter.gds"],
+            "lef": ["dir::../../lef/user_proj_counter.lef"],
+            "nl": ["dir::../../verilog/gl/user_proj_counter.v"],
+            "spef": {
+                "min_*": ["dir::../../spef/multicorner/user_proj_counter.min.spef"],
+                "nom_*": ["dir::../../spef/multicorner/user_proj_counter.nom.spef"],
+                "max_*": ["dir::../../spef/multicorner/user_proj_counter.max.spef"]
+            },
+            "lib": {
+                "*": "dir::../../lib/user_proj_counter.lib"
+            },
+            "instances": {
+                "mprj": {
+                    "location": [150, 500],
+                    "orientation": "N"
+                }
+            }
+        }
+    },
+    "PDN_MACRO_CONNECTIONS": ["mprj vccd1 vssd1 vccd1 vssd1"],
 
     "meta": {
         "version": 3,
@@ -37,9 +71,16 @@
         }
     },
 
+    "SYNTH_ELABORATE_ONLY": true,
+    "//assign": "CF_gpio_config's MODE-selected ternaries stay as plain `assign`",
+    "//assign2": "statements after elaborate-only synthesis (no constant folding/opt",
+    "//assign3": "runs); openframe_project_wrapper's config disables this same checker",
+    "//assign4": "for the same reason (ERROR_ON_NL_ASSIGN_STATEMENTS: 0).",
+    "ERROR_ON_NL_ASSIGN_STATEMENTS": false,
+    "ERROR_ON_SYNTH_CHECKS": false,
+
     "CLOCK_PORT": "gpio_in[0]",
     "CLOCK_PERIOD": 25,
-    "RUN_CTS": true,
 
     "PNR_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
     "SIGNOFF_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
@@ -64,18 +105,20 @@
     "PDN_CORE_RING": false,
     "RT_MAX_LAYER": "met4",
 
-    "//sparse": "Counter example is tiny vs. the 32 mm^2 die. Skip tap/fill so",
-    "//sparse2": "harden does not insert hundreds of thousands of tap cells, and",
-    "//sparse3": "keep placement density low so the tiny design stays clustered.",
+    "//nothing-enabled": "Reference-template convention (openframe_project_wrapper /",
+    "//nothing-enabled2": "user_project_wrapper): the wrapper has zero standard cells, so",
+    "//nothing-enabled3": "nothing besides elaborate + PDN + macro placement runs here.",
+    "RUN_CTS": false,
     "RUN_TAP_ENDCAP_INSERTION": false,
     "RUN_FILL_INSERTION": false,
-    "PL_TARGET_DENSITY_PCT": 5,
-
-    "MAX_TRANSITION_CONSTRAINT": 1.0,
-    "MAX_FANOUT_CONSTRAINT": 16,
-    "GRT_REPAIR_ANTENNAS": true,
-    "GRT_ANTENNA_ITERS": 10,
-    "DIODE_ON_PORTS": "in",
+    "FP_PDN_ENABLE_RAILS": false,
+    "GRT_REPAIR_ANTENNAS": false,
+    "RUN_HEURISTIC_DIODE_INSERTION": false,
+    "PL_RESIZER_DESIGN_OPTIMIZATIONS": false,
+    "PL_RESIZER_TIMING_OPTIMIZATIONS": false,
+    "GLB_RESIZER_TIMING_OPTIMIZATIONS": false,
+    "GLB_RESIZER_DESIGN_OPTIMIZATIONS": false,
+    "PL_RESIZER_BUFFER_INPUT_PORTS": false,
 
     "MAGIC_EXT_UNIQUE": "notopports",
     "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",

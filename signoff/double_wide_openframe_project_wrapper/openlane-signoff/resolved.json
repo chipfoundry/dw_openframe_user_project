@@ -85,8 +85,8 @@
     "SYNTH_EXCLUDED_CELL_FILE": "/workspace/dw_openframe_user_project/dependencies/pdks/ciel/sky130/versions/74c0e6b118a67d94c24172143d3bd597473fa63d/sky130A/libs.tech/librelane/sky130_fd_sc_hd/no_synth.cells",
     "PNR_EXCLUDED_CELL_FILE": "/workspace/dw_openframe_user_project/dependencies/pdks/ciel/sky130/versions/74c0e6b118a67d94c24172143d3bd597473fa63d/sky130A/libs.tech/librelane/sky130_fd_sc_hd/drc_exclude.cells",
     "OUTPUT_CAP_LOAD": 33.442,
-    "MAX_FANOUT_CONSTRAINT": 16,
-    "MAX_TRANSITION_CONSTRAINT": 1,
+    "MAX_FANOUT_CONSTRAINT": 10,
+    "MAX_TRANSITION_CONSTRAINT": 0.75,
     "MAX_CAPACITANCE_CONSTRAINT": 0.2,
     "CLOCK_UNCERTAINTY_CONSTRAINT": 0.25,
     "CLOCK_TRANSITION_CONSTRAINT": 0.15,
@@ -139,9 +139,53 @@
         4766.63
     ],
     "EXTRA_EXCLUDED_CELLS": null,
-    "MACROS": null,
+    "MACROS": {
+        "user_proj_counter": {
+            "gds": [
+                "/workspace/dw_openframe_user_project/gds/user_proj_counter.gds"
+            ],
+            "lef": [
+                "/workspace/dw_openframe_user_project/lef/user_proj_counter.lef"
+            ],
+            "instances": {
+                "mprj": {
+                    "location": [
+                        150,
+                        500
+                    ],
+                    "orientation": "N"
+                }
+            },
+            "vh": [],
+            "nl": [
+                "/workspace/dw_openframe_user_project/verilog/gl/user_proj_counter.v"
+            ],
+            "pnl": [],
+            "spef": {
+                "min_*": [
+                    "/workspace/dw_openframe_user_project/spef/multicorner/user_proj_counter.min.spef"
+                ],
+                "nom_*": [
+                    "/workspace/dw_openframe_user_project/spef/multicorner/user_proj_counter.nom.spef"
+                ],
+                "max_*": [
+                    "/workspace/dw_openframe_user_project/spef/multicorner/user_proj_counter.max.spef"
+                ]
+            },
+            "lib": {
+                "*": [
+                    "/workspace/dw_openframe_user_project/lib/user_proj_counter.lib"
+                ]
+            },
+            "spice": [],
+            "sdf": {},
+            "json_h": null
+        }
+    },
     "EXTRA_LEFS": null,
-    "EXTRA_VERILOG_MODELS": null,
+    "EXTRA_VERILOG_MODELS": [
+        "/workspace/dw_openframe_user_project/verilog/gl/user_proj_counter.v"
+    ],
     "EXTRA_SPICE_MODELS": null,
     "EXTRA_CDLS": null,
     "EXTRA_LIBS": null,
@@ -236,13 +280,13 @@
     "PAD_ROTATION_VERTICAL": "R180",
     "PAD_ROTATION_CORNER": "R180",
     "RUN_TAP_ENDCAP_INSERTION": false,
-    "RUN_POST_GPL_DESIGN_REPAIR": true,
+    "RUN_POST_GPL_DESIGN_REPAIR": false,
     "RUN_POST_GRT_DESIGN_REPAIR": false,
-    "RUN_CTS": true,
-    "RUN_POST_CTS_RESIZER_TIMING": true,
+    "RUN_CTS": false,
+    "RUN_POST_CTS_RESIZER_TIMING": false,
     "RUN_POST_GRT_RESIZER_TIMING": false,
     "RUN_HEURISTIC_DIODE_INSERTION": false,
-    "RUN_ANTENNA_REPAIR": true,
+    "RUN_ANTENNA_REPAIR": false,
     "RUN_DRT": true,
     "RUN_FILL_INSERTION": false,
     "RUN_MCSTA": true,
@@ -259,7 +303,6 @@
     "RUN_LINTER": true,
     "VERILOG_FILES": [
         "/workspace/dw_openframe_user_project/verilog/rtl/CF_gpio_config.v",
-        "/workspace/dw_openframe_user_project/verilog/rtl/user_proj_counter.v",
         "/workspace/dw_openframe_user_project/verilog/rtl/double_wide_openframe_project_wrapper.v"
     ],
     "VERILOG_INCLUDE_DIRS": null,
@@ -320,13 +363,13 @@
     "SYNTH_SHARE_RESOURCES": true,
     "SYNTH_ADDER_TYPE": "YOSYS",
     "SYNTH_EXTRA_MAPPING_FILE": null,
-    "SYNTH_ELABORATE_ONLY": false,
+    "SYNTH_ELABORATE_ONLY": true,
     "SYNTH_MUL_BOOTH": false,
     "SYNTH_TIE_UNDEFINED": "low",
     "SYNTH_WRITE_NOATTR": true,
     "SYNTH_NORMALIZE_SINGLE_BIT_VECTORS": true,
-    "ERROR_ON_SYNTH_CHECKS": true,
-    "ERROR_ON_NL_ASSIGN_STATEMENTS": true,
+    "ERROR_ON_SYNTH_CHECKS": false,
+    "ERROR_ON_NL_ASSIGN_STATEMENTS": false,
     "PNR_SDC_FILE": "/workspace/dw_openframe_user_project/openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc",
     "SIGNOFF_SDC_FILE": "/workspace/dw_openframe_user_project/openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc",
     "PNR_CORNERS": null,
@@ -336,7 +379,9 @@
     "SIGNAL_WIRE_RC_LAYERS": null,
     "CLOCK_WIRE_RC_LAYERS": null,
     "PDN_CONNECT_MACROS_TO_GRID": true,
-    "PDN_MACRO_CONNECTIONS": null,
+    "PDN_MACRO_CONNECTIONS": [
+        "mprj vccd1 vssd1 vccd1 vssd1"
+    ],
     "PDN_ENABLE_GLOBAL_CONNECTIONS": true,
     "STA_EXTRA_CORNER_TCL_FILE": null,
     "DEDUPLICATE_CORNERS": false,
@@ -370,7 +415,7 @@
     "PDN_OBSTRUCTIONS": null,
     "PDN_SKIPTRIM": false,
     "PDN_CORE_RING": false,
-    "PDN_ENABLE_RAILS": true,
+    "PDN_ENABLE_RAILS": false,
     "PDN_HORIZONTAL_HALO": 10,
     "PDN_VERTICAL_HALO": 10,
     "PDN_MULTILAYER": true,
@@ -421,7 +466,7 @@
     "RSZ_DONT_TOUCH_RX": "$^",
     "RSZ_DONT_TOUCH_LIST": null,
     "RSZ_CORNERS": null,
-    "PL_TARGET_DENSITY_PCT": 5,
+    "PL_TARGET_DENSITY_PCT": null,
     "PL_SKIP_INITIAL_PLACEMENT": false,
     "PL_WIRE_LENGTH_COEF": 0.25,
     "PL_MIN_PHI_COEFFICIENT": null,
@@ -452,12 +497,12 @@
     "ERROR_ON_PDN_VIOLATIONS": false,
     "DIODE_PADDING": null,
     "GRT_ALLOW_CONGESTION": false,
-    "GRT_ANTENNA_REPAIR_ITERS": 10,
+    "GRT_ANTENNA_REPAIR_ITERS": 3,
     "GRT_OVERFLOW_ITERS": 50,
     "GRT_ANTENNA_REPAIR_MARGIN": 10,
     "GRT_ANTENNA_REPAIR_JUMPER_ONLY": false,
     "GRT_ANTENNA_REPAIR_DIODE_ONLY": false,
-    "DESIGN_REPAIR_BUFFER_INPUT_PORTS": true,
+    "DESIGN_REPAIR_BUFFER_INPUT_PORTS": false,
     "DESIGN_REPAIR_BUFFER_OUTPUT_PORTS": true,
     "DESIGN_REPAIR_TIE_FANOUT": true,
     "DESIGN_REPAIR_TIE_SEPARATION": false,
@@ -505,7 +550,7 @@
     "GRT_DESIGN_REPAIR_MAX_WIRE_LENGTH": 0,
     "GRT_DESIGN_REPAIR_MAX_SLEW_PCT": 10,
     "GRT_DESIGN_REPAIR_MAX_CAP_PCT": 10,
-    "DIODE_ON_PORTS": "in",
+    "DIODE_ON_PORTS": "none",
     "HEURISTIC_ANTENNA_THRESHOLD": 90,
     "GRT_RESIZER_HOLD_SLACK_MARGIN": 0.05,
     "GRT_RESIZER_SETUP_SLACK_MARGIN": 0.025,
