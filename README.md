@@ -46,8 +46,9 @@ You implement your design and connect it directly to the GPIOs through the pins 
 
 | Path | Description |
 | :--- | :--- |
-| `openlane/double_wide_openframe_project_wrapper/` | The one LibreLane 3 config for the whole (flat) wrapper design. `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
+| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 3 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
 | `openlane/double_wide_openframe_project_wrapper/pin_template.def` | Wrapper pin template from the harness. Do not edit. |
+| `openlane/user_proj_counter/` | LibreLane 3 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
 | `verilog/rtl/` | RTL sources. |
 | `verilog/gl/` | Gate-level netlists written by `cf harden`. |
 | `verilog/dv/cocotb/` | cocotb tests run by `cf verify`. |
@@ -66,9 +67,9 @@ The template ships a small, fully hardened example so every flow step works out 
 | 13:2 | `count[11:0]` (outputs) |
 | 62:14 | unused, configured as analog (high impedance) |
 
-* `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is a plain RTL submodule; its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
-* `double_wide_openframe_project_wrapper` instantiates it directly and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants.
-* There is only one `openlane/` design: the whole wrapper (GPIO config + your logic) is synthesized and hardened flat with LibreLane 3. LibreLane's own power-grid generator reaches the padframe-aligned `vccd1`/`vssd1` pins directly, so no separate macro or metal-only "connection" cell is needed to bridge power to the pads.
+* `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is hardened on its own as a macro (`openlane/user_proj_counter/`); its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
+* `double_wide_openframe_project_wrapper` places it via a `MACROS` entry in its own `config.json` and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants. This is the same macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`: the wrapper has no standard cells of its own, so it is hardened `SYNTH_ELABORATE_ONLY` and carries only the GPIO-config wiring and the macro instance.
+* LibreLane's own power-grid generator reaches the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and `PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid, so no metal-only "connection" cell is needed to bridge power to the pads.
 
 ---
 
@@ -115,32 +116,40 @@ This installs, inside the project:
 
 ### Hardening the Design
 
-#### One flat design, hardened with LibreLane 3
+#### Macro + wrapper split, hardened with LibreLane 3
 
-Unlike `analog`/`digital`/`openframe` projects, `double_wide` has a single
-`openlane/` design: the whole wrapper (your logic + GPIO pad configuration)
-is synthesized and placed-and-routed together, the same way the upstream
-Double-Wide OpenFrame template is built. `cf harden` detects the
+`double_wide` follows the same macro+wrapper split as `openframe_project_wrapper`
+(`user_proj_timer`) and `user_project_wrapper` (`user_proj_example`): each
+piece of real logic is hardened on its own as a dense macro in its own
+`openlane/<macro>/` directory, then placed into the top-level wrapper through
+a `MACROS` entry. The wrapper itself has no standard cells of its own — it is
+`SYNTH_ELABORATE_ONLY`, carrying only the GPIO pad configuration
+(`CF_gpio_config`) and the macro instance(s). `cf harden` detects the
 `double_wide` project type and automatically runs **LibreLane 3** for it
 (every other project type keeps using the standard LibreLane/OpenLane 2
 version cf-cli normally pins) — LibreLane 3's power-grid generator reaches
-the padframe-aligned `vccd1`/`vssd1` pins directly, so there is no separate
-macro to harden and no metal-only "connection" cell bridging power to the
-pads.
+the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and
+`PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid,
+so no metal-only "connection" cell is needed to bridge power to the pads.
 
-Add your logic as plain RTL submodules instantiated from
-`verilog/rtl/double_wide_openframe_project_wrapper.v` (see
-`user_proj_counter.v` for an example), list every new file in
-`openlane/double_wide_openframe_project_wrapper/config.json` →
-`VERILOG_FILES` and in `verilog/includes/includes.rtl.openframe_user_project`,
-then harden the whole wrapper:
+To add your own logic: create a new `openlane/<macro>/config.json` for it
+(see `openlane/user_proj_counter/config.json` for a template), harden the
+macro on its own, then add a `MACROS` entry for it in
+`openlane/double_wide_openframe_project_wrapper/config.json` pointing at the
+macro's `gds`/`lef`/`nl`/`spef`/`lib` views and an `instances` placement, and
+instantiate it (or a blackbox stub read via `EXTRA_VERILOG_MODELS`) from
+`verilog/rtl/double_wide_openframe_project_wrapper.v`. List every macro's
+hardened netlist in both `openlane/user_proj_counter/config.json` →
+`VERILOG_FILES` and `verilog/includes/includes.rtl.openframe_user_project`,
+then harden each macro and the wrapper:
 
 ```bash
+cf harden user_proj_counter
 cf harden double_wide_openframe_project_wrapper
 ```
 
 Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`,
-`verilog/gl/` and `signoff/`.
+`verilog/gl/` and `signoff/` for both the macro(s) and the wrapper.
 
 The wrapper's constraints file
 (`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`,

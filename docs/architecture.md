@@ -20,13 +20,17 @@ master reset from the `resetb` pad (`resetb_h`, `resetb_l`) and per-pad
 
 The wrapper keeps the OpenFrame multi-domain port names: `vccd1`/`vssd1`,
 `vccd2`/`vssd2`, `vdda*`/`vssa*`, `vddio`/`vssio`. Digital logic connects to
-**`vccd1`/`vssd1`**. The wrapper is hardened as a single flat design with
-LibreLane 3 (`openlane/double_wide_openframe_project_wrapper/config.json`,
-`meta.version: 3`): LibreLane's own `OpenROAD.GeneratePDN` step builds the
-power grid and, because `PDN_ENABLE_PINS` is on by default, promotes every
-grid stripe that reaches the core/die boundary straight into a `vccd1`/`vssd1`
-block pin at the padframe-aligned location. No metal-only "connection" macro
-is needed to bridge the grid to the pad pins.
+**`vccd1`/`vssd1`**. The wrapper is hardened with LibreLane 3
+(`openlane/double_wide_openframe_project_wrapper/config.json`,
+`meta.version: 3`) as an elaborate-only shell with zero standard cells of its
+own -- the same macro+wrapper split `openframe_project_wrapper` uses for
+`user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`.
+LibreLane's own `OpenROAD.GeneratePDN` step builds the power grid and,
+because `PDN_ENABLE_PINS` is on by default, promotes every grid stripe that
+reaches the core/die boundary straight into a `vccd1`/`vssd1` block pin at
+the padframe-aligned location; `PDN_MACRO_CONNECTIONS` stitches the
+`user_proj_counter` macro's own power pins into that same grid. No metal-only
+"connection" macro is needed to bridge the grid to the pad pins.
 
 ## Example design
 
@@ -37,11 +41,13 @@ is needed to bridge the grid to the pad pins.
 | 13:2 | `count[11:0]` | output |
 | 62:14 | unused | analog (input buffer off, high impedance) |
 
-`user_proj_counter` is a plain RTL submodule of the wrapper (synthesized flat,
-not a separate hardened macro). It resets asynchronously on
-`rst_n & porb_l & resetb_l` and releases reset through a two-flop
-synchronizer, so the asynchronous pad and frame resets cannot cause
-recovery/removal violations.
+`user_proj_counter` is hardened on its own
+(`openlane/user_proj_counter/config.json`) as a dense macro and placed into
+the wrapper via a `MACROS` entry, exactly like `user_proj_timer` in
+`openframe_project_wrapper` and `user_proj_example` in `user_project_wrapper`.
+It resets asynchronously on `rst_n & porb_l & resetb_l` and releases reset
+through a two-flop synchronizer, so the asynchronous pad and frame resets
+cannot cause recovery/removal violations.
 
 ## Timing constraints
 
