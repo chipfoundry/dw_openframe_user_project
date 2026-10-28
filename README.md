@@ -20,193 +20,200 @@
 - [Checklist for Shuttle Submission](#checklist-for-shuttle-submission)
 
 ## Overview
-Double-Wide OpenFrame is a ChipFoundry project template that provides only a bare padframe (no integrated SoC), giving you a **32 mm² user area** and **63 GPIOs** to design your own custom chip. It is twice as wide as the standard OpenFrame while keeping the same pad interface. You are free to implement your design and directly connect it to the available GPIOs through the pins provided on the `double_wide_openframe_project_wrapper`.
+Double-Wide OpenFrame is a ChipFoundry project template that provides only a bare padframe (no integrated SoC), giving you a **32 mm² user area** (6754.63 × 4766.63 µm) and **63 GPIOs** to design your own custom chip. It is twice as wide as the standard OpenFrame and keeps the same pad interface, including the frame power-on reset (`porb_h`, `porb_l`, `por_l`), the master reset (`resetb_h`, `resetb_l`) and per-pad constant one/zero loopbacks.
 
-The harness (pad ring + empty wrapper template) lives in a separate repository, [`../dw_openframe`](../dw_openframe). You build your design here, harden it, then it is cell-swapped into the harness to produce the final chip.
+You implement your design and connect it directly to the GPIOs through the pins of `double_wide_openframe_project_wrapper`. The whole flow (setup, hardening, simulation, precheck, submission) is driven by the ChipFoundry CLI (`cf`); no Makefiles are needed.
 
 ---
 
 ## Documentation & Resources
-For detailed hardware specifications and design guidelines, refer to the following official documents:
-
-* **[Double-Wide OpenFrame Datasheet](../dw_openframe/docs/datasheet.md)**: Die/user-area geometry, I/O map, power domains, GPIO and reset interface, and integration contract.
-* **[Pinout](../dw_openframe/docs/pinout.md)**: Full GPIO index map and package bond-pad coordinates.
-* **[GPIO ↔ pad map (`pad_summary.json`)](../dw_openframe/pad_summary.json)**: Machine-readable pinout source of truth.
-* **[ChipFoundry Marketplace](https://platform.chipfoundry.io/marketplace)**: Access additional IP blocks, EDA tools, and shuttle services.
+* **[Double-Wide OpenFrame harness](https://github.com/chipfoundry/double_wide_openframe)**: padframe, empty wrapper template, datasheet and pinout. `cf setup` installs it into `caravel/`.
+* **[Datasheet](https://github.com/chipfoundry/double_wide_openframe/blob/main/docs/datasheet.md)**: die/user-area geometry, I/O map, power domains, GPIO and reset interface.
+* **[Pinout](https://github.com/chipfoundry/double_wide_openframe/blob/main/docs/pinout.md)**: GPIO index map and bond-pad coordinates.
+* **[ChipFoundry Marketplace](https://platform.chipfoundry.io/marketplace)**: additional IP blocks, EDA tools, and shuttle services.
 
 ---
 
 ## Prerequisites
-Ensure your environment meets the following requirements:
-
-1. **Docker** [Linux](https://docs.docker.com/desktop/setup/install/linux/ubuntu/) | [Windows](https://docs.docker.com/desktop/setup/install/windows-install/) | [Mac](https://docs.docker.com/desktop/setup/install/mac-install/)
-2. **Python 3.8+** with `pip`.
-3. **Git**: For repository management.
+1. **Docker** [Linux](https://docs.docker.com/desktop/setup/install/linux/ubuntu/) | [Windows](https://docs.docker.com/desktop/setup/install/windows-install/) | [Mac](https://docs.docker.com/desktop/setup/install/mac-install/) (precheck and cocotb simulation).
+2. **Nix** (recommended) or Docker for LibreLane hardening.
+3. **Python 3.8+** with `pip` and `venv`.
+4. **Git**.
 
 ---
 
 ## Project Structure
-A successful Double-Wide OpenFrame project requires a specific directory layout for the automated tools to function:
 
-| Directory | Description |
+| Path | Description |
 | :--- | :--- |
-| `openlane/` | LibreLane configuration files for hardening macros and the wrapper (incl. the wrapper pin template). |
-| `verilog/rtl/` | Source Verilog code for the project. |
-| `verilog/gl/` | Gate-level netlists (generated after hardening). |
-| `verilog/dv/` | Design Verification (cocotb and Verilog testbenches). |
-| `gds/` | Final GDSII binary files for fabrication. |
-| `lef/` | Library Exchange Format files for the macros. |
-| `lvs/` | LVS configuration used by the local precheck. |
-| `.cf/` | ChipFoundry project metadata. |
+| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 3 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
+| `openlane/double_wide_openframe_project_wrapper/pin_template.def` | Wrapper pin template from the harness. Do not edit. |
+| `openlane/user_proj_counter/` | LibreLane 3 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
+| `verilog/rtl/` | RTL sources. |
+| `verilog/gl/` | Gate-level netlists written by `cf harden`. |
+| `verilog/dv/cocotb/` | cocotb tests run by `cf verify`. |
+| `verilog/includes/` | File lists used by `cf verify` (`includes.{rtl,gl}.openframe_user_project`). |
+| `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`, `signoff/` | Hardened views written by `cf harden`. |
+| `lvs/double_wide_openframe_project_wrapper/` | LVS configuration used by `cf precheck`. |
+| `.cf/` | ChipFoundry metadata. `project.json` is created by `cf init` and is not committed. |
+
+### Example design
+The template ships a small, fully hardened example so every flow step works out of the box:
+
+| GPIO | Use |
+| :--- | :--- |
+| 0 | user clock (input) |
+| 1 | active-low reset (input with pull-up) |
+| 13:2 | `count[11:0]` (outputs) |
+| 62:14 | unused, configured as analog (high impedance) |
+
+* `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is hardened on its own as a macro (`openlane/user_proj_counter/`); its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
+* `double_wide_openframe_project_wrapper` places it via a `MACROS` entry in its own `config.json` and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants. This is the same macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`: the wrapper has no standard cells of its own, so it is hardened `SYNTH_ELABORATE_ONLY` and carries only the GPIO-config wiring and the macro instance.
+* LibreLane's own power-grid generator reaches the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and `PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid, so no metal-only "connection" cell is needed to bridge power to the pads.
 
 ---
 
 ## Starting Your Project
 
 ### 1. Repository Setup
-Create a new repository based on the `dw_openframe_user_project` template and clone it to your local machine:
+Create a repository from the `dw_openframe_user_project` template and clone it:
 
 ```bash
 git clone <your-github-repo-URL>
-pip install 'chipfoundry-cli>=2'
 cd <project_name>
+pip install chipfoundry-cli
 ```
 
 ### 2. Project Initialization
 
 > [!IMPORTANT]
-> Run this first! Initialize your project configuration:
+> Run this first:
 
 ```bash
 cf init
 ```
 
-This creates `.cf/project.json` with project metadata (project type `double_wide`). **This must be run before any other commands.**
+Choose project type **`double_wide`**. This creates `.cf/project.json`; every other command depends on it.
 
 ### 3. Environment Setup
-Install the ChipFoundry CLI tool and set up the local environment (PDK, LibreLane, and the Double-Wide OpenFrame harness):
 
 ```bash
 cf setup
-# or: make setup
 ```
 
-The setup step installs:
+This installs, inside the project:
 
-- Double-Wide OpenFrame: The harness template ([`../dw_openframe`](../dw_openframe)).
-- LibreLane 3: The RTL-to-GDS hardening flow.
-- PDK: Skywater 130nm process design kit (sky130A, via Ciel).
-- Timing Scripts: For Static Timing Analysis (STA).
+* `caravel/`: the Double-Wide OpenFrame harness (padframe, golden empty wrapper, simulation top-level).
+* `openlane/.venv`: LibreLane (the hardening flow itself runs through Nix or Docker).
+* `dependencies/pdks`: the sky130 PDK (via Ciel).
+* `dependencies/timing-scripts`: static timing analysis scripts.
+* `venv-cocotb`: caravel-cocotb, plus the `chipfoundry/dv:cocotb` Docker image.
+* `cf-precheck`.
 
 ---
 
 ## Development Flow
 
 ### Hardening the Design
-Hardening is the process of synthesizing your RTL and performing Place & Route (P&R) to create a GDSII layout.
 
-#### Macro Hardening
-Create a subdirectory for each custom macro under `openlane/` containing your `config.json`.
+#### Macro + wrapper split, hardened with LibreLane 3
+
+`double_wide` follows the same macro+wrapper split as `openframe_project_wrapper`
+(`user_proj_timer`) and `user_project_wrapper` (`user_proj_example`): each
+piece of real logic is hardened on its own as a dense macro in its own
+`openlane/<macro>/` directory, then placed into the top-level wrapper through
+a `MACROS` entry. The wrapper itself has no standard cells of its own — it is
+`SYNTH_ELABORATE_ONLY`, carrying only the GPIO pad configuration
+(`CF_gpio_config`) and the macro instance(s). `cf harden` detects the
+`double_wide` project type and automatically runs **LibreLane 3** for it
+(every other project type keeps using the standard LibreLane/OpenLane 2
+version cf-cli normally pins) — LibreLane 3's power-grid generator reaches
+the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and
+`PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid,
+so no metal-only "connection" cell is needed to bridge power to the pads.
+
+To add your own logic: create a new `openlane/<macro>/config.json` for it
+(see `openlane/user_proj_counter/config.json` for a template), harden the
+macro on its own, then add a `MACROS` entry for it in
+`openlane/double_wide_openframe_project_wrapper/config.json` pointing at the
+macro's `gds`/`lef`/`nl`/`spef`/`lib` views and an `instances` placement, and
+instantiate it (or a blackbox stub read via `EXTRA_VERILOG_MODELS`) from
+`verilog/rtl/double_wide_openframe_project_wrapper.v`. List every macro's
+hardened netlist in both `openlane/user_proj_counter/config.json` →
+`VERILOG_FILES` and `verilog/includes/includes.rtl.openframe_user_project`,
+then harden each macro and the wrapper:
 
 ```bash
-cf harden --list         # List detected configurations
-cf harden <macro_name>   # Harden a specific macro
-```
-
-#### Integration
-Instantiate your module(s) in `verilog/rtl/double_wide_openframe_project_wrapper.v`.
-
-Update the wrapper `openlane/double_wide_openframe_project_wrapper/config.json` environment variables (`VERILOG_FILES_BLACKBOX`, `EXTRA_LEFS`, `EXTRA_GDS_FILES`) to point to your new macros.
-
-#### Wrapper Hardening
-Finalize the top-level user project:
-
-```bash
+cf harden user_proj_counter
 cf harden double_wide_openframe_project_wrapper
-# or: nix develop --command make harden
 ```
 
-#### Cell-Swap into the Harness
-Once your wrapper GDS is hardened, integrate it into the double-wide padframe to produce the final chip:
+Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`,
+`verilog/gl/` and `signoff/` for both the macro(s) and the wrapper.
 
-```bash
-cd ../dw_openframe
-nix develop --command make integrate \
-  USER_GDS=../dw_openframe_user_project/gds/double_wide_openframe_project_wrapper.gds
-```
+The wrapper's constraints file
+(`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`,
+set as `PNR_SDC_FILE` and `SIGNOFF_SDC_FILE`) models GPIO-driven inputs with
+the characterized pad input transition and treats asynchronous reset inputs
+as false paths. Adapt the clock, I/O delays and false paths to your design.
+Protect your logic's inputs against wrapper-level antenna effects (the
+example uses `DIODE_ON_PORTS: "in"`).
+
+Magic/KLayout DRC and Netgen LVS are disabled during `cf harden` itself
+(`meta.substituting_steps` in `config.json`) — full DRC/LVS signoff happens
+with `cf precheck`, same as every other project type.
 
 ### Important Notes
 
-**Connecting to Power:**
-   - Ensure your design is connected to power using the power pins on the wrapper.
-   - Connect your digital logic to the **`vccd1` / `vssd1`** domain (see the [datasheet power domains](../dw_openframe/docs/datasheet.md#power-domains)).
+**Power:**
+* Connect digital logic to **`vccd1` / `vssd1`**. LibreLane's `GeneratePDN`
+  step builds the grid and (via `PDN_ENABLE_PINS`, on by default) promotes
+  the stripes that reach the core/die boundary into `vccd1`/`vssd1` block
+  pins aligned with the padframe automatically.
 
-**Wrapper Contract:**
-   - The top module must be named `double_wide_openframe_project_wrapper`.
-   - The module footprint (**6754.63 × 4766.63 µm**) and boundary pin locations are fixed by the harness pin template — keep the module name and port list identical to the empty template.
+**Wrapper contract:**
+* The top module must be named `double_wide_openframe_project_wrapper`, with the port list of `caravel/verilog/rtl/__double_wide_openframe_project_wrapper.v`.
+* The footprint (6754.63 × 4766.63 µm) and boundary pins are fixed by `pin_template.def`. `cf precheck` XORs the boundary against the harness golden wrapper.
+
+**GPIO configuration:**
+* Every pad's `dm`, `inp_dis`, `oeb` and analog controls must be driven. Use `CF_gpio_config` (or loopback constants) for every GPIO, including unused ones. `cf gpio-config` does not apply to double-wide projects.
 
 ### Verification
 
-#### 1. Simulation
-We use cocotb for functional verification. Ensure your file lists are updated in `verilog/includes/`. This example also ships a wrapper-level iverilog testbench in `verilog/dv/counter/`.
-
-Run RTL Simulation:
+cocotb tests live in `verilog/dv/cocotb/<test>/` and are registered in `cocotb_tests.py`. `cf verify` runs them at chip level: the testbench drives the padframe pins of the harness (`caravel/verilog/rtl/toplevel_cocotb.v`), so the full path from pad to your logic is simulated.
 
 ```bash
-cf verify <test_name>
-# or, for the bundled counter TB:
-make verify
+cf verify counter              # RTL
+cf verify counter --sim gl     # gate level (after hardening)
+cf verify --all                # every test in user_proj_tests/user_proj_tests.yaml
+cf verify --all --sim gl       # every test in user_proj_tests/user_proj_tests_gl.yaml
 ```
 
-Run Gate-Level (GL) Simulation:
-
-```bash
-cf verify <test_name> --sim gl
-```
-
-Run all tests:
-
-```bash
-cf verify --all
-```
-
-The bundled example is a 32-bit counter: **gpio0 = clk**, **gpio1 = rst_n**, **gpio[33:2] = count**.
+The cocotb environment (`OpenFrame_env`) exposes `drive_gpio`, `release_gpio`, `monitor_gpio(_range)` for GPIOs 0-62, and `dut.resetb_tb` for the master reset pad.
 
 ---
 
 ## Local Precheck
-Before submitting your design for fabrication, run the local precheck to ensure it complies with all shuttle requirements.
-
-> [!IMPORTANT]
-> Stock `cf precheck` runs Docker + the PyPI cf-precheck against `/opt/caravel` and does **not** yet detect `double_wide_openframe_project_wrapper.gds`. For double-wide, use **`make precheck`**, which calls the workspace [cf-precheck](../cf-precheck) fork with this project's harness as the golden root (`-c ../dw_openframe`):
 
 ```bash
-make precheck
+cf precheck
 ```
 
-Under the hood this runs:
-
-```text
-python3 -m cf_precheck -i . -p $PDK_ROOT/sky130A -c ../dw_openframe
-```
-
-Requires `PYTHONPATH` to include `../cf-precheck/src` and KLayout's `pya` (`/usr/lib/klayout/pymod`). Set `PDK_ROOT` (the Makefile defaults to `~/.ciel`).
-
-You can also run or skip specific checks:
+For double-wide projects `cf precheck` uses the harness installed in `caravel/` as the golden reference (XOR boundary, port list). Useful options:
 
 ```bash
-make precheck CHECKS="topcell_check xor"     # Run specific checks only
-make precheck SKIP_CHECKS="lvs oeb"          # Skip specific checks
+cf precheck --checks xor lvs     # run specific checks
+cf precheck --skip-checks lvs    # skip checks
+cf precheck --magic-drc          # include the optional Magic DRC
 ```
 
 ---
 
 ## Checklist for Shuttle Submission
 - [ ] Top-level macro is named `double_wide_openframe_project_wrapper`.
-- [ ] Full Chip Simulation passes for both RTL and GL.
-- [ ] Hardened Macros are LVS and DRC clean.
-- [ ] `double_wide_openframe_project_wrapper` matches the required pin order/template.
-- [ ] Design is properly connected to power (`vccd1` / `vssd1`).
-- [ ] Design passes the local `make precheck`.
-- [ ] Hardened wrapper GDS is cell-swapped into the harness via `make integrate`.
-- [ ] Documentation (this README) is updated with project-specific details.
+- [ ] `cf verify --all` and `cf verify --all --sim gl` pass.
+- [ ] All macros and the wrapper are hardened with `cf harden` and their views are committed.
+- [ ] The wrapper keeps the fixed pin template (`pin_template.def`) and the padframe-matching `DIE_AREA`/`CORE_AREA`.
+- [ ] Every GPIO is configured (including unused pads).
+- [ ] `cf precheck` passes.
+- [ ] This README describes your design.
