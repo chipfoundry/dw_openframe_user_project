@@ -46,9 +46,9 @@ You implement your design and connect it directly to the GPIOs through the pins 
 
 | Path | Description |
 | :--- | :--- |
-| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 3 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
+| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 2 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
 | `openlane/double_wide_openframe_project_wrapper/pin_template.def` | Wrapper pin template from the harness. Do not edit. |
-| `openlane/user_proj_counter/` | LibreLane 3 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
+| `openlane/user_proj_counter/` | LibreLane 2 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
 | `verilog/rtl/` | RTL sources. |
 | `verilog/gl/` | Gate-level netlists written by `cf harden`. |
 | `verilog/dv/cocotb/` | cocotb tests run by `cf verify`. |
@@ -69,7 +69,7 @@ The template ships a small, fully hardened example so every flow step works out 
 
 * `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is hardened on its own as a macro (`openlane/user_proj_counter/`); its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
 * `double_wide_openframe_project_wrapper` places it via a `MACROS` entry in its own `config.json` and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants. This is the same macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`: the wrapper has no standard cells of its own, so it is hardened `SYNTH_ELABORATE_ONLY` and carries only the GPIO-config wiring and the macro instance.
-* The wrapper's [`pdn_cfg.tcl`](openlane/double_wide_openframe_project_wrapper/pdn_cfg.tcl) builds LibreLane's standard power grid and then connects every padframe-aligned power port of `pin_template.def` to it, and `PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid, so no metal-only "connection" cell is needed to bridge power to the pads.
+* Power follows OpenFrame: a `vccd1`/`vssd1` core ring, joined to the `vccd1` and `vssd1` pads by two fixed connection macros (`dw_vccd1_connection`, `dw_vssd1_connection`) in [`fixed_dont_change/`](openlane/double_wide_openframe_project_wrapper/fixed_dont_change). The flow places them for you; they are not instantiated in your RTL.
 
 ---
 
@@ -116,7 +116,7 @@ This installs, inside the project:
 
 ### Hardening the Design
 
-#### Macro + wrapper split, hardened with LibreLane 3
+#### Macro + wrapper split, hardened with LibreLane 2
 
 `double_wide` follows the same macro+wrapper split as `openframe_project_wrapper`
 (`user_proj_timer`) and `user_project_wrapper` (`user_proj_example`): each
@@ -124,14 +124,9 @@ piece of real logic is hardened on its own as a dense macro in its own
 `openlane/<macro>/` directory, then placed into the top-level wrapper through
 a `MACROS` entry. The wrapper itself has no standard cells of its own — it is
 `SYNTH_ELABORATE_ONLY`, carrying only the GPIO pad configuration
-(`CF_gpio_config`) and the macro instance(s). `cf harden` detects the
-`double_wide` project type and automatically runs **LibreLane 3** for it
-(every other project type keeps using the standard LibreLane/OpenLane 2
-version cf-cli normally pins). The wrapper's `pdn_cfg.tcl` (set as `PDN_CFG`)
-builds LibreLane's standard power grid and then connects every
-padframe-aligned power port of `pin_template.def` to it, and
-`PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid,
-so no metal-only "connection" cell is needed to bridge power to the pads.
+(`CF_gpio_config`) and the macro instance(s). It is hardened with
+**LibreLane 2** (2.4.6, the `CI2511` release used by `openframe_user_project`);
+the project's `flake.nix` pins that release for `cf harden`.
 
 To add your own logic: create a new `openlane/<macro>/config.json` for it
 (see `openlane/user_proj_counter/config.json` for a template), harden the
@@ -167,17 +162,23 @@ with `cf precheck`, same as every other project type.
 ### Important Notes
 
 **Power:**
-* Connect digital logic to **`vccd1` / `vssd1`**.
-* The padframe hands each supply over as met3 straps that end on the
-  pad-aligned power ports at the edge of the user area. During `GeneratePDN`,
-  `pdn_cfg.tcl` ties each of those ports (all 14 supplies) to the nearest
-  grid stripes of its net, and `FP_TEMPLATE_COPY_POWER_PINS` keeps the ports
-  themselves as the wrapper's power pins. The step log reports
-  `Connected 48 pad power ports ...`; if a port cannot be connected the flow
-  stops there with the reason.
-* The connections live in the 40 µm margin between the die edge and
-  `CORE_AREA`. Keep that margin as shipped and free of macros and core rings.
-  `PDN_*` pitch, width, offset and spacing can be changed freely.
+* Connect digital logic to **`vccd1` / `vssd1`**. They are distributed by a
+  core ring (two 20 µm rings, `vccd1` inside `vssd1`) and the grid that
+  `FP_PDN_*` describes; `FP_PDN_MACRO_HOOKS` ties each of your macros to it.
+* The ring is joined to the padframe by `dw_vccd1_connection` and
+  `dw_vssd1_connection`: met3 plates with via arrays that carry the `vccd1`
+  and `vssd1` pad ports on the east edge onto the ring, the same scheme as
+  OpenFrame's `vccd1_connection` / `vssd1_connection`.
+  `fixed_dont_change/pdn_cfg.tcl` places them during `GeneratePDN` (the log
+  says `Placed 2 power connection macros.`), so do not instantiate or place
+  them yourself.
+* Do not edit `fixed_dont_change/`, and keep the two connection `MACROS`
+  entries, `FP_PDN_CFG`, `FP_PDN_CORE_RING_*`, `FP_DEF_TEMPLATE`, `DIE_AREA`
+  and `CORE_AREA` in the wrapper's `config.json` as shipped. The grid pitch,
+  width and offset (`FP_PDN_VPITCH` etc.) are yours to change.
+* The other supplies (`vccd`, `vccd2`, `vdda*`, `vddio` and their grounds)
+  are available as pad-aligned met3 pins on the wrapper edge, as in OpenFrame,
+  with no ring or grid. Route them yourself if your design uses them.
 
 **Wrapper contract:**
 * The top module must be named `double_wide_openframe_project_wrapper`, with the port list of `caravel/verilog/rtl/__double_wide_openframe_project_wrapper.v`.
@@ -221,7 +222,7 @@ cf precheck --magic-drc          # include the optional Magic DRC
 - [ ] Top-level macro is named `double_wide_openframe_project_wrapper`.
 - [ ] `cf verify --all` and `cf verify --all --sim gl` pass.
 - [ ] All macros and the wrapper are hardened with `cf harden` and their views are committed.
-- [ ] The wrapper keeps the fixed pin template (`pin_template.def`), `pdn_cfg.tcl` and the padframe-matching `DIE_AREA`/`CORE_AREA`.
+- [ ] The wrapper keeps the fixed pin template (`pin_template.def`), `fixed_dont_change/` and the padframe-matching `DIE_AREA`/`CORE_AREA`.
 - [ ] Every GPIO is configured (including unused pads).
 - [ ] `cf precheck` passes.
 - [ ] This README describes your design.

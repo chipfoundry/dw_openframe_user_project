@@ -20,31 +20,35 @@ master reset from the `resetb` pad (`resetb_h`, `resetb_l`) and per-pad
 
 The wrapper keeps the OpenFrame multi-domain port names: `vccd1`/`vssd1`,
 `vccd2`/`vssd2`, `vdda*`/`vssa*`, `vddio`/`vssio`. Digital logic connects to
-**`vccd1`/`vssd1`**. The wrapper is hardened with LibreLane 3
-(`openlane/double_wide_openframe_project_wrapper/config.json`,
-`meta.version: 3`) as an elaborate-only shell with zero standard cells of its
-own -- the same macro+wrapper split `openframe_project_wrapper` uses for
-`user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`.
+**`vccd1`/`vssd1`**. The wrapper is hardened with LibreLane 2
+(`openlane/double_wide_openframe_project_wrapper/config.json`) as an
+elaborate-only shell with zero standard cells of its own -- the same
+macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer`
+and `user_project_wrapper` uses for `user_proj_example`.
 
-The padframe hands each supply over as met3 straps that end on pad-aligned
-power ports at the edge of the user area (listed in `pin_template.def`).
-LibreLane's `OpenROAD.GeneratePDN` step builds the met4/met5 grid inside the
-core area only, so the wrapper's `pdn_cfg.tcl` (`PDN_CFG`) adds the missing
-link after the grid is generated. For every power port of the template it
-draws, inside the 40 µm margin between the die edge and the core:
+Power distribution follows OpenFrame:
 
-* a met3 strap as wide as the port, from the die edge inward;
-* a bar along the edge from the strap to the nearest stripes of the same net
-  (met4 on the east/west edges, met3 on the north/south edges, so the signal
-  pins on each edge still route underneath);
-* a stub extending each of those stripes out over the bar, with via arrays
-  at each junction.
+* `vccd1` and `vssd1` run on a core ring in the 40 µm margin between the die
+  edge and the core area: two 20 µm rings on met4/met5, `vccd1` inside
+  `vssd1`. The grid stripes extend to the ring, and `FP_PDN_MACRO_HOOKS` ties
+  the `user_proj_counter` macro to the grid.
+* The padframe hands each supply over as met3 straps that end on pad-aligned
+  ports at the edge of the user area (`pin_template.def`).
+  `FP_TEMPLATE_COPY_POWER_PINS` keeps those ports as the wrapper's power pins.
+* `dw_vccd1_connection` and `dw_vssd1_connection` bridge the two: each is a
+  met3 plate covering one pad's two ports, with via3 arrays onto that
+  supply's ring leg (inner leg for `vccd1`, outer leg for `vssd1`). They are
+  the double-wide counterparts of OpenFrame's `vccd1_connection` and
+  `vssd1_connection`.
 
-`FP_TEMPLATE_COPY_POWER_PINS` restores the template's ports as the wrapper's
-power pins, and `PDN_MACRO_CONNECTIONS` stitches the `user_proj_counter`
-macro's own power pins into the grid. No metal-only "connection" macro is
-needed. `PDN_ENABLE_PINS` alone is not enough: it only labels grid stripes as
-pins and never reaches the pad-aligned ports.
+The connection macros live in
+`openlane/double_wide_openframe_project_wrapper/fixed_dont_change/` together
+with `pdn_cfg.tcl`, which places them at fixed locations during
+`OpenROAD.GeneratePDN`. They are not part of the RTL and have no placement in
+`config.json`, so every hardened wrapper carries them in the same place.
+
+The remaining supplies (`vccd`, `vccd2`, `vdda*`, `vddio` and their grounds)
+are edge pins only, as in OpenFrame.
 
 ## Example design
 
