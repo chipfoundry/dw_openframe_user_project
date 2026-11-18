@@ -147,6 +147,22 @@ cf harden double_wide_openframe_project_wrapper
 Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`,
 `verilog/gl/` and `signoff/` for both the macro(s) and the wrapper.
 
+The large views are committed gzipped (`gds/double_wide_openframe_project_wrapper.gds.gz`
+and the `mag/*.mag.gz` files); their plain versions are in `.gitignore`.
+After re-hardening, compress the new ones before committing, and expand them
+again whenever you need the plain files:
+
+```bash
+make -f caravel/Makefile compress
+```
+
+```bash
+make -f caravel/Makefile uncompress
+```
+
+`cf precheck` runs `uncompress` itself. Macro GDS files that the wrapper's
+`config.json` reads (such as `gds/user_proj_counter.gds`) stay uncompressed.
+
 The wrapper's constraints file
 (`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`,
 set as `PNR_SDC_FILE` and `SIGNOFF_SDC_FILE`) models GPIO-driven inputs with
