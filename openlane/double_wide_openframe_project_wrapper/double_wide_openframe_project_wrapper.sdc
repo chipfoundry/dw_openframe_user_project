@@ -7,7 +7,7 @@
 # CF_gpio_config tie-offs. Pad-driven inputs use the characterized pad input
 # transition from the Caravel signoff constraints (io_in).
 
-set clk_port [get_ports {gpio_in[0]}]
+set clk_port [get_ports {gpio_in[48]}]
 create_clock $clk_port -name clk -period 25
 
 set_max_fanout 16 [current_design]
@@ -22,7 +22,7 @@ set_case_analysis 0 [get_ports {gpio_loopback_zero[*]}]
 set_case_analysis 1 [get_ports {gpio_loopback_one[*]}]
 
 # Reset inputs are asynchronous to the user clock (see user_proj_counter).
-set_false_path -from [get_ports {gpio_in[1] porb_l porb_h por_l resetb_l resetb_h}]
+set_false_path -from [get_ports {gpio_in[47] porb_l porb_h por_l resetb_l resetb_h}]
 
 set_output_delay [expr 25 * 0.2] -clock [get_clocks clk] [get_ports {gpio_out[*]}]
 set_load 0.033442 [all_outputs]

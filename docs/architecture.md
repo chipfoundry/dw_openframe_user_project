@@ -20,26 +20,47 @@ master reset from the `resetb` pad (`resetb_h`, `resetb_l`) and per-pad
 
 The wrapper keeps the OpenFrame multi-domain port names: `vccd1`/`vssd1`,
 `vccd2`/`vssd2`, `vdda*`/`vssa*`, `vddio`/`vssio`. Digital logic connects to
-**`vccd1`/`vssd1`**. The wrapper is hardened with LibreLane 3
-(`openlane/double_wide_openframe_project_wrapper/config.json`,
-`meta.version: 3`) as an elaborate-only shell with zero standard cells of its
-own -- the same macro+wrapper split `openframe_project_wrapper` uses for
-`user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`.
-LibreLane's own `OpenROAD.GeneratePDN` step builds the power grid and,
-because `PDN_ENABLE_PINS` is on by default, promotes every grid stripe that
-reaches the core/die boundary straight into a `vccd1`/`vssd1` block pin at
-the padframe-aligned location; `PDN_MACRO_CONNECTIONS` stitches the
-`user_proj_counter` macro's own power pins into that same grid. No metal-only
-"connection" macro is needed to bridge the grid to the pad pins.
+**`vccd1`/`vssd1`**. The wrapper is hardened with LibreLane 2
+(`openlane/double_wide_openframe_project_wrapper/config.json`) as an
+elaborate-only shell with zero standard cells of its own -- the same
+macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer`
+and `user_project_wrapper` uses for `user_proj_example`.
+
+Power distribution follows OpenFrame:
+
+* `vccd1` and `vssd1` run on a core ring in the 40 µm margin between the die
+  edge and the core area: two 20 µm rings on met4/met5, `vccd1` inside
+  `vssd1`. The grid stripes extend to the ring, and `FP_PDN_MACRO_HOOKS` ties
+  the `user_proj_counter` macro to the grid.
+* The padframe hands each supply over as met3 straps that end on pad-aligned
+  ports at the edge of the user area (`pin_template.def`).
+  `FP_TEMPLATE_COPY_POWER_PINS` keeps those ports as the wrapper's power pins.
+* `dw_vccd1_connection` and `dw_vssd1_connection` bridge the two: each is a
+  met3 plate covering one pad's two ports, with via3 arrays onto that
+  supply's ring leg (inner leg for `vccd1`, outer leg for `vssd1`). They are
+  the double-wide counterparts of OpenFrame's `vccd1_connection` and
+  `vssd1_connection`.
+
+The connection macros live in
+`openlane/double_wide_openframe_project_wrapper/fixed_dont_change/` together
+with `pdn_cfg.tcl`, which places them at fixed locations during
+`OpenROAD.GeneratePDN`. They are not part of the RTL and have no placement in
+`config.json`, so every hardened wrapper carries them in the same place.
+
+The remaining supplies (`vccd`, `vccd2`, `vdda*`, `vddio` and their grounds)
+are edge pins only, as in OpenFrame.
 
 ## Example design
 
 | GPIO | Role | `CF_gpio_config` mode |
 |------|------|------|
-| 0 | user clock | input |
-| 1 | active-low reset | input with pull-up |
-| 13:2 | `count[11:0]` | output |
-| 62:14 | unused | analog (input buffer off, high impedance) |
+| 48 | user clock | input |
+| 47 | active-low reset | input with pull-up |
+| 46 down to 35 | `count[0]` up to `count[11]` | output |
+| all others | unused | analog (input buffer off, high impedance) |
+
+The example uses the 14 west-edge pads, next to the frame reset pins; GPIO
+indices run down that edge.
 
 `user_proj_counter` is hardened on its own
 (`openlane/user_proj_counter/config.json`) as a dense macro and placed into

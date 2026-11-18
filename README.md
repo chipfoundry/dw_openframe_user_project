@@ -46,9 +46,9 @@ You implement your design and connect it directly to the GPIOs through the pins 
 
 | Path | Description |
 | :--- | :--- |
-| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 3 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
+| `openlane/double_wide_openframe_project_wrapper/` | LibreLane 2 config for the top-level wrapper (elaborate-only shell + GPIO config + `MACROS` placement of your macros). `cf harden` runs LibreLane 3 for `double_wide` projects automatically. |
 | `openlane/double_wide_openframe_project_wrapper/pin_template.def` | Wrapper pin template from the harness. Do not edit. |
-| `openlane/user_proj_counter/` | LibreLane 3 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
+| `openlane/user_proj_counter/` | LibreLane 2 config for the example `user_proj_counter` macro, hardened on its own and placed into the wrapper. Add one `openlane/<macro>/` directory per macro your design needs. |
 | `verilog/rtl/` | RTL sources. |
 | `verilog/gl/` | Gate-level netlists written by `cf harden`. |
 | `verilog/dv/cocotb/` | cocotb tests run by `cf verify`. |
@@ -62,14 +62,16 @@ The template ships a small, fully hardened example so every flow step works out 
 
 | GPIO | Use |
 | :--- | :--- |
-| 0 | user clock (input) |
-| 1 | active-low reset (input with pull-up) |
-| 13:2 | `count[11:0]` (outputs) |
-| 62:14 | unused, configured as analog (high impedance) |
+| 48 | user clock (input) |
+| 47 | active-low reset (input with pull-up) |
+| 46 down to 35 | `count[0]` up to `count[11]` (outputs) |
+| all others | unused, configured as analog (high impedance) |
+
+These are the 14 pads of the west edge, next to the frame's power-on and master reset pins. GPIO indices run down that edge (35 at the top, 48 at the bottom).
 
 * `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is hardened on its own as a macro (`openlane/user_proj_counter/`); its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
 * `double_wide_openframe_project_wrapper` places it via a `MACROS` entry in its own `config.json` and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants. This is the same macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`: the wrapper has no standard cells of its own, so it is hardened `SYNTH_ELABORATE_ONLY` and carries only the GPIO-config wiring and the macro instance.
-* LibreLane's own power-grid generator reaches the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and `PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid, so no metal-only "connection" cell is needed to bridge power to the pads.
+* Power follows OpenFrame: a `vccd1`/`vssd1` core ring, joined to the `vccd1` and `vssd1` pads by two fixed connection macros (`dw_vccd1_connection`, `dw_vssd1_connection`) in [`fixed_dont_change/`](openlane/double_wide_openframe_project_wrapper/fixed_dont_change). The flow places them for you; they are not instantiated in your RTL.
 
 ---
 
@@ -116,7 +118,7 @@ This installs, inside the project:
 
 ### Hardening the Design
 
-#### Macro + wrapper split, hardened with LibreLane 3
+#### Macro + wrapper split, hardened with LibreLane 2
 
 `double_wide` follows the same macro+wrapper split as `openframe_project_wrapper`
 (`user_proj_timer`) and `user_project_wrapper` (`user_proj_example`): each
@@ -124,13 +126,9 @@ piece of real logic is hardened on its own as a dense macro in its own
 `openlane/<macro>/` directory, then placed into the top-level wrapper through
 a `MACROS` entry. The wrapper itself has no standard cells of its own — it is
 `SYNTH_ELABORATE_ONLY`, carrying only the GPIO pad configuration
-(`CF_gpio_config`) and the macro instance(s). `cf harden` detects the
-`double_wide` project type and automatically runs **LibreLane 3** for it
-(every other project type keeps using the standard LibreLane/OpenLane 2
-version cf-cli normally pins) — LibreLane 3's power-grid generator reaches
-the padframe-aligned `vccd1`/`vssd1` pins directly (`PDN_ENABLE_PINS`), and
-`PDN_MACRO_CONNECTIONS` stitches each macro's power pins into that same grid,
-so no metal-only "connection" cell is needed to bridge power to the pads.
+(`CF_gpio_config`) and the macro instance(s). It is hardened with
+**LibreLane 2** (2.4.6, the `CI2511` release used by `openframe_user_project`);
+the project's `flake.nix` pins that release for `cf harden`.
 
 To add your own logic: create a new `openlane/<macro>/config.json` for it
 (see `openlane/user_proj_counter/config.json` for a template), harden the
@@ -151,6 +149,22 @@ cf harden double_wide_openframe_project_wrapper
 Views are written to `gds/`, `lef/`, `def/`, `mag/`, `lib/`, `spef/`,
 `verilog/gl/` and `signoff/` for both the macro(s) and the wrapper.
 
+The large views are committed gzipped (`gds/double_wide_openframe_project_wrapper.gds.gz`
+and the `mag/*.mag.gz` files); their plain versions are in `.gitignore`.
+After re-hardening, compress the new ones before committing, and expand them
+again whenever you need the plain files:
+
+```bash
+make -f caravel/Makefile compress
+```
+
+```bash
+make -f caravel/Makefile uncompress
+```
+
+`cf precheck` runs `uncompress` itself. Macro GDS files that the wrapper's
+`config.json` reads (such as `gds/user_proj_counter.gds`) stay uncompressed.
+
 The wrapper's constraints file
 (`openlane/double_wide_openframe_project_wrapper/double_wide_openframe_project_wrapper.sdc`,
 set as `PNR_SDC_FILE` and `SIGNOFF_SDC_FILE`) models GPIO-driven inputs with
@@ -166,10 +180,23 @@ with `cf precheck`, same as every other project type.
 ### Important Notes
 
 **Power:**
-* Connect digital logic to **`vccd1` / `vssd1`**. LibreLane's `GeneratePDN`
-  step builds the grid and (via `PDN_ENABLE_PINS`, on by default) promotes
-  the stripes that reach the core/die boundary into `vccd1`/`vssd1` block
-  pins aligned with the padframe automatically.
+* Connect digital logic to **`vccd1` / `vssd1`**. They are distributed by a
+  core ring (two 20 µm rings, `vccd1` inside `vssd1`) and the grid that
+  `FP_PDN_*` describes; `FP_PDN_MACRO_HOOKS` ties each of your macros to it.
+* The ring is joined to the padframe by `dw_vccd1_connection` and
+  `dw_vssd1_connection`: met3 plates with via arrays that carry the `vccd1`
+  and `vssd1` pad ports on the east edge onto the ring, the same scheme as
+  OpenFrame's `vccd1_connection` / `vssd1_connection`.
+  `fixed_dont_change/pdn_cfg.tcl` places them during `GeneratePDN` (the log
+  says `Placed 2 power connection macros.`), so do not instantiate or place
+  them yourself.
+* Do not edit `fixed_dont_change/`, and keep the two connection `MACROS`
+  entries, `FP_PDN_CFG`, `FP_PDN_CORE_RING_*`, `FP_DEF_TEMPLATE`, `DIE_AREA`
+  and `CORE_AREA` in the wrapper's `config.json` as shipped. The grid pitch,
+  width and offset (`FP_PDN_VPITCH` etc.) are yours to change.
+* The other supplies (`vccd`, `vccd2`, `vdda*`, `vddio` and their grounds)
+  are available as pad-aligned met3 pins on the wrapper edge, as in OpenFrame,
+  with no ring or grid. Route them yourself if your design uses them.
 
 **Wrapper contract:**
 * The top module must be named `double_wide_openframe_project_wrapper`, with the port list of `caravel/verilog/rtl/__double_wide_openframe_project_wrapper.v`.
@@ -213,7 +240,7 @@ cf precheck --magic-drc          # include the optional Magic DRC
 - [ ] Top-level macro is named `double_wide_openframe_project_wrapper`.
 - [ ] `cf verify --all` and `cf verify --all --sim gl` pass.
 - [ ] All macros and the wrapper are hardened with `cf harden` and their views are committed.
-- [ ] The wrapper keeps the fixed pin template (`pin_template.def`) and the padframe-matching `DIE_AREA`/`CORE_AREA`.
+- [ ] The wrapper keeps the fixed pin template (`pin_template.def`), `fixed_dont_change/` and the padframe-matching `DIE_AREA`/`CORE_AREA`.
 - [ ] Every GPIO is configured (including unused pads).
 - [ ] `cf precheck` passes.
 - [ ] This README describes your design.

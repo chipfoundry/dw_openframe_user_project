@@ -1,129 +1,154 @@
 {
-    "//": "Double-wide openframe user project wrapper hardening (LibreLane 3).",
-    "//structure": "openframe_user_project-style layout: openlane/<macro>/config.json.",
-    "//footprint": "Same DESIGN_NAME / DIE_AREA / power pins as the padframe's empty",
-    "//footprint2": "wrapper, and the same pad-aligned pin template, so the hardened GDS",
-    "//footprint3": "cell-swaps cleanly into the ../dw_openframe padframe frame.",
-
-    "//macro": "user_proj_counter is its own hardened macro (openlane/user_proj_counter/),",
-    "//macro2": "the same macro/wrapper split that openframe_project_wrapper uses for",
-    "//macro3": "user_proj_timer and user_project_wrapper uses for user_proj_example.",
-    "//macro4": "This wrapper carries no standard cells of its own: CF_gpio_config's",
-    "//macro5": "MODE parameter is resolved at elaborate time to plain wiring (see",
-    "//macro6": "verilog/rtl/CF_gpio_config.v), so SYNTH_ELABORATE_ONLY is safe/correct",
-    "//macro7": "and every synthesis/CTS/tap/fill/antenna knob below is off, matching",
-    "//macro8": "the reference templates. LibreLane 3's native PDN generator still",
-    "//macro9": "reaches the pad-aligned power pins directly (PDN_ENABLE_PINS, the",
-    "//macro10": "default) and stitches the counter macro's power pins into that same",
-    "//macro11": "grid via PDN_MACRO_CONNECTIONS, so no bridging 'connection' macros",
-    "//macro12": "are needed either.",
-
-    "//signoff": "DRC/LVS signoff is deferred to `cf precheck` (golden sky130 rules,",
-    "//signoff2": "same as every other project type, and the only place the padframe +",
-    "//signoff3": "wrapper + macro are assembled together); Magic/KLayout DRC and",
-    "//signoff4": "Netgen LVS are disabled here via substituting_steps (no RUN_ gate",
-    "//signoff5": "exists for them in LibreLane 3), matching openframe_project_wrapper's",
-    "//signoff6": "RUN_LVS/RUN_CVC: 0 at the wrapper level.",
-
+    "//": "double_wide_openframe_project_wrapper, hardened with LibreLane 2 (same flow as openframe_project_wrapper).",
+    "//power": "Power follows openframe: a vccd1/vssd1 core ring, joined to the vccd1 and vssd1 pads by the",
+    "//power2": "dw_vccd1_connection / dw_vssd1_connection macros. fixed_dont_change/pdn_cfg.tcl places those",
+    "//power3": "macros itself, so they are not instantiated in the RTL and have no placement here. Leave the",
+    "//power4": "two connection MACROS entries, FP_PDN_CFG, FP_PDN_CORE_RING_*, FP_DEF_TEMPLATE, DIE_AREA and",
+    "//power5": "CORE_AREA as they are.",
     "DESIGN_NAME": "double_wide_openframe_project_wrapper",
+    "VERILOG_DEFINES": [
+        "PnR"
+    ],
     "VERILOG_FILES": [
         "dir::../../verilog/rtl/CF_gpio_config.v",
         "dir::../../verilog/rtl/double_wide_openframe_project_wrapper.v"
     ],
-    "EXTRA_VERILOG_MODELS": [
-        "dir::../../verilog/gl/user_proj_counter.v"
-    ],
-
     "MACROS": {
         "user_proj_counter": {
-            "gds": ["dir::../../gds/user_proj_counter.gds"],
-            "lef": ["dir::../../lef/user_proj_counter.lef"],
-            "nl": ["dir::../../verilog/gl/user_proj_counter.v"],
+            "gds": [
+                "dir::../../gds/user_proj_counter.gds"
+            ],
+            "lef": [
+                "dir::../../lef/user_proj_counter.lef"
+            ],
+            "nl": [
+                "dir::../../verilog/gl/user_proj_counter.v"
+            ],
             "spef": {
-                "min_*": ["dir::../../spef/multicorner/user_proj_counter.min.spef"],
-                "nom_*": ["dir::../../spef/multicorner/user_proj_counter.nom.spef"],
-                "max_*": ["dir::../../spef/multicorner/user_proj_counter.max.spef"]
+                "min_*": [
+                    "dir::../../spef/multicorner/user_proj_counter.min.spef"
+                ],
+                "nom_*": [
+                    "dir::../../spef/multicorner/user_proj_counter.nom.spef"
+                ],
+                "max_*": [
+                    "dir::../../spef/multicorner/user_proj_counter.max.spef"
+                ]
             },
             "lib": {
-                "*": "dir::../../lib/user_proj_counter.lib"
+                "max_ff_n40C_1v95": [
+                    "dir::../../lib/multicorner/user_proj_counter__max_ff_n40C_1v95.lib"
+                ],
+                "max_ss_100C_1v60": [
+                    "dir::../../lib/multicorner/user_proj_counter__max_ss_100C_1v60.lib"
+                ],
+                "max_tt_025C_1v80": [
+                    "dir::../../lib/multicorner/user_proj_counter__max_tt_025C_1v80.lib"
+                ],
+                "min_ff_n40C_1v95": [
+                    "dir::../../lib/multicorner/user_proj_counter__min_ff_n40C_1v95.lib"
+                ],
+                "min_ss_100C_1v60": [
+                    "dir::../../lib/multicorner/user_proj_counter__min_ss_100C_1v60.lib"
+                ],
+                "min_tt_025C_1v80": [
+                    "dir::../../lib/multicorner/user_proj_counter__min_tt_025C_1v80.lib"
+                ],
+                "nom_ff_n40C_1v95": [
+                    "dir::../../lib/multicorner/user_proj_counter__nom_ff_n40C_1v95.lib"
+                ],
+                "nom_ss_100C_1v60": [
+                    "dir::../../lib/multicorner/user_proj_counter__nom_ss_100C_1v60.lib"
+                ],
+                "nom_tt_025C_1v80": [
+                    "dir::../../lib/multicorner/user_proj_counter__nom_tt_025C_1v80.lib"
+                ]
             },
             "instances": {
                 "mprj": {
-                    "location": [150, 500],
+                    "location": [
+                        150,
+                        500
+                    ],
                     "orientation": "N"
                 }
             }
+        },
+        "dw_vccd1_connection": {
+            "gds": [
+                "dir::fixed_dont_change/dw_vccd1_connection.gds"
+            ],
+            "lef": [
+                "dir::fixed_dont_change/dw_vccd1_connection.lef"
+            ]
+        },
+        "dw_vssd1_connection": {
+            "gds": [
+                "dir::fixed_dont_change/dw_vssd1_connection.gds"
+            ],
+            "lef": [
+                "dir::fixed_dont_change/dw_vssd1_connection.lef"
+            ]
         }
     },
-    "PDN_MACRO_CONNECTIONS": ["mprj vccd1 vssd1 vccd1 vssd1"],
-
-    "meta": {
-        "version": 3,
-        "flow": "Classic",
-        "substituting_steps": {
-            "Magic.DRC": null,
-            "Checker.MagicDRC": null,
-            "KLayout.DRC": null,
-            "Checker.KLayoutDRC": null,
-            "Checker.YosysUnmappedCells": null,
-            "Netgen.LVS": null,
-            "Checker.LVS": null
-        }
-    },
-
-    "SYNTH_ELABORATE_ONLY": true,
-    "//assign": "CF_gpio_config's MODE-selected ternaries stay as plain `assign`",
-    "//assign2": "statements after elaborate-only synthesis (no constant folding/opt",
-    "//assign3": "runs); openframe_project_wrapper's config disables this same checker",
-    "//assign4": "for the same reason (ERROR_ON_NL_ASSIGN_STATEMENTS: 0).",
-    "ERROR_ON_NL_ASSIGN_STATEMENTS": false,
-    "ERROR_ON_SYNTH_CHECKS": false,
-
-    "CLOCK_PORT": "gpio_in[0]",
-    "CLOCK_PERIOD": 25,
-
     "PNR_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
     "SIGNOFF_SDC_FILE": "dir::double_wide_openframe_project_wrapper.sdc",
-
-    "FP_SIZING": "absolute",
-    "DIE_AREA": [0, 0, 6754.63, 4766.63],
-    "CORE_AREA": [40, 40, 6714.63, 4726.63],
-
-    "//pin-template": "Fixed, pad-aligned pin locations (shipped from the padframe",
-    "//pin-template2": "generator; keep in sync with ../dw_openframe librelane/wrapper/",
-    "//pin-template3": "pin_template.def) so the wrapper's boundary pins match the frame.",
-    "FP_DEF_TEMPLATE": "dir::pin_template.def",
-    "FP_TEMPLATE_MATCH_MODE": "permissive",
-
-    "VDD_NETS": ["vccd1", "vccd2", "vccd", "vddio", "vdda", "vdda1", "vdda2"],
-    "GND_NETS": ["vssd1", "vssd2", "vssd", "vssio", "vssa", "vssa1", "vssa2"],
-
-    "PDN_MULTILAYER": true,
-    "PDN_VPITCH": 180,
-    "PDN_HPITCH": 180,
-    "ERROR_ON_PDN_VIOLATIONS": false,
-    "PDN_CORE_RING": false,
-    "RT_MAX_LAYER": "met4",
-
-    "//nothing-enabled": "Reference-template convention (openframe_project_wrapper /",
-    "//nothing-enabled2": "user_project_wrapper): the wrapper has zero standard cells, so",
-    "//nothing-enabled3": "nothing besides elaborate + PDN + macro placement runs here.",
-    "RUN_CTS": false,
-    "RUN_TAP_ENDCAP_INSERTION": false,
-    "RUN_FILL_INSERTION": false,
-    "FP_PDN_ENABLE_RAILS": false,
-    "GRT_REPAIR_ANTENNAS": false,
-    "RUN_HEURISTIC_DIODE_INSERTION": false,
+    "IGNORE_DISCONNECTED_MODULES": [
+        "dw_vccd1_connection",
+        "dw_vssd1_connection"
+    ],
+    "MAX_TRANSITION_CONSTRAINT": 1.0,
+    "ERROR_ON_NL_ASSIGN_STATEMENTS": false,
+    "QUIT_ON_SYNTH_CHECKS": false,
+    "SYNTH_ELABORATE_ONLY": true,
+    "SYNTH_USE_PG_PINS_DEFINES": "USE_POWER_PINS",
+    "PL_RANDOM_GLB_PLACEMENT": true,
     "PL_RESIZER_DESIGN_OPTIMIZATIONS": false,
     "PL_RESIZER_TIMING_OPTIMIZATIONS": false,
     "GLB_RESIZER_TIMING_OPTIMIZATIONS": false,
     "GLB_RESIZER_DESIGN_OPTIMIZATIONS": false,
     "PL_RESIZER_BUFFER_INPUT_PORTS": false,
-
-    "MAGIC_EXT_UNIQUE": "notopports",
-    "PRIMARY_GDSII_STREAMOUT_TOOL": "klayout",
-
-    "LINTER_DISABLE_WARNINGS": [
-        "DECLFILENAME", "EOFNEWLINE", "PINCONNECTEMPTY", "PINMISSING", "UNUSEDSIGNAL"
-    ]
+    "RUN_CTS": false,
+    "FP_PDN_ENABLE_RAILS": false,
+    "GRT_REPAIR_ANTENNAS": false,
+    "RUN_HEURISTIC_DIODE_INSERTION": false,
+    "RUN_FILL_INSERTION": false,
+    "RUN_TAP_DECAP_INSERTION": false,
+    "FP_PDN_CHECK_NODES": false,
+    "FP_PDN_VPITCH": 40,
+    "FP_PDN_HPITCH": 40,
+    "FP_PDN_VOFFSET": 18.43,
+    "FP_PDN_HOFFSET": 22.83,
+    "FP_PDN_VWIDTH": 6.4,
+    "FP_PDN_HWIDTH": 6.4,
+    "FP_PDN_HSPACING": 3.2,
+    "FP_PDN_VSPACING": 3.2,
+    "FP_PDN_CORE_RING": true,
+    "FP_PDN_CORE_RING_VWIDTH": 20,
+    "FP_PDN_CORE_RING_HWIDTH": 20,
+    "FP_PDN_CORE_RING_VOFFSET": -4,
+    "FP_PDN_CORE_RING_HOFFSET": -4,
+    "FP_PDN_CORE_RING_VSPACING": 2.4,
+    "FP_PDN_CORE_RING_HSPACING": 2.4,
+    "FP_PDN_MACRO_HOOKS": "mprj vccd1 vssd1 vccd1 vssd1",
+    "FP_PDN_CFG": "dir::fixed_dont_change/pdn_cfg.tcl",
+    "VDD_NETS": [
+        "vccd1"
+    ],
+    "GND_NETS": [
+        "vssd1"
+    ],
+    "MAGIC_ZEROIZE_ORIGIN": false,
+    "FP_SIZING": "absolute",
+    "DIE_AREA": "0 0 6754.63 4766.63",
+    "CORE_AREA": "40 40 6714.63 4726.63",
+    "FP_DEF_TEMPLATE": "dir::pin_template.def",
+    "FP_TEMPLATE_COPY_POWER_PINS": true,
+    "FP_TEMPLATE_MATCH_MODE": "permissive",
+    "RUN_IRDROP_REPORT": false,
+    "RUN_LINTER": false,
+    "RUN_CVC": false,
+    "MAGIC_DEF_LABELS": false,
+    "MAGIC_EXT_USE_GDS": true,
+    "RUN_LVS": false
 }
