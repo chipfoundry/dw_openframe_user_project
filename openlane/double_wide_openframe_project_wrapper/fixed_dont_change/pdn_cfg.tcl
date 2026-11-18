@@ -139,7 +139,7 @@ add_pdn_connect \
 namespace eval dw_power {
     # {macro x y} in microns, orientation N.
     variable connections {
-        {dw_vccd1_connection 6710.515 4327.505}
+        {dw_vccd1_connection 6710.515 4327.510}
         {dw_vssd1_connection 6710.515 2088.510}
     }
 }
