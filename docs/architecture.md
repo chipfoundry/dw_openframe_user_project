@@ -25,12 +25,26 @@ The wrapper keeps the OpenFrame multi-domain port names: `vccd1`/`vssd1`,
 `meta.version: 3`) as an elaborate-only shell with zero standard cells of its
 own -- the same macro+wrapper split `openframe_project_wrapper` uses for
 `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`.
-LibreLane's own `OpenROAD.GeneratePDN` step builds the power grid and,
-because `PDN_ENABLE_PINS` is on by default, promotes every grid stripe that
-reaches the core/die boundary straight into a `vccd1`/`vssd1` block pin at
-the padframe-aligned location; `PDN_MACRO_CONNECTIONS` stitches the
-`user_proj_counter` macro's own power pins into that same grid. No metal-only
-"connection" macro is needed to bridge the grid to the pad pins.
+
+The padframe hands each supply over as met3 straps that end on pad-aligned
+power ports at the edge of the user area (listed in `pin_template.def`).
+LibreLane's `OpenROAD.GeneratePDN` step builds the met4/met5 grid inside the
+core area only, so the wrapper's `pdn_cfg.tcl` (`PDN_CFG`) adds the missing
+link after the grid is generated. For every power port of the template it
+draws, inside the 40 µm margin between the die edge and the core:
+
+* a met3 strap as wide as the port, from the die edge inward;
+* a bar along the edge from the strap to the nearest stripes of the same net
+  (met4 on the east/west edges, met3 on the north/south edges, so the signal
+  pins on each edge still route underneath);
+* a stub extending each of those stripes out over the bar, with via arrays
+  at each junction.
+
+`FP_TEMPLATE_COPY_POWER_PINS` restores the template's ports as the wrapper's
+power pins, and `PDN_MACRO_CONNECTIONS` stitches the `user_proj_counter`
+macro's own power pins into the grid. No metal-only "connection" macro is
+needed. `PDN_ENABLE_PINS` alone is not enough: it only labels grid stripes as
+pins and never reaches the pad-aligned ports.
 
 ## Example design
 

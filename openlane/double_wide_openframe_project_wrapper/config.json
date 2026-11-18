@@ -12,11 +12,13 @@
     "//macro5": "MODE parameter is resolved at elaborate time to plain wiring (see",
     "//macro6": "verilog/rtl/CF_gpio_config.v), so SYNTH_ELABORATE_ONLY is safe/correct",
     "//macro7": "and every synthesis/CTS/tap/fill/antenna knob below is off, matching",
-    "//macro8": "the reference templates. LibreLane 3's native PDN generator still",
-    "//macro9": "reaches the pad-aligned power pins directly (PDN_ENABLE_PINS, the",
-    "//macro10": "default) and stitches the counter macro's power pins into that same",
-    "//macro11": "grid via PDN_MACRO_CONNECTIONS, so no bridging 'connection' macros",
-    "//macro12": "are needed either.",
+    "//macro8": "the reference templates.",
+
+    "//power": "pdn_cfg.tcl builds LibreLane's stock met4/met5 grid, then straps",
+    "//power2": "every pad-aligned met3 power port of pin_template.def into it, so",
+    "//power3": "all 14 supplies reach the padframe with no 'connection' macros.",
+    "//power4": "FP_TEMPLATE_COPY_POWER_PINS restores those ports as the wrapper's",
+    "//power5": "power pins; PDN_MACRO_CONNECTIONS ties the counter macro to the grid.",
 
     "//signoff": "DRC/LVS signoff is deferred to `cf precheck` (golden sky130 rules,",
     "//signoff2": "same as every other project type, and the only place the padframe +",
@@ -98,6 +100,8 @@
     "VDD_NETS": ["vccd1", "vccd2", "vccd", "vddio", "vdda", "vdda1", "vdda2"],
     "GND_NETS": ["vssd1", "vssd2", "vssd", "vssio", "vssa", "vssa1", "vssa2"],
 
+    "FP_TEMPLATE_COPY_POWER_PINS": true,
+    "PDN_CFG": "dir::pdn_cfg.tcl",
     "PDN_MULTILAYER": true,
     "PDN_VPITCH": 180,
     "PDN_HPITCH": 180,
