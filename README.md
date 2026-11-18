@@ -62,10 +62,12 @@ The template ships a small, fully hardened example so every flow step works out 
 
 | GPIO | Use |
 | :--- | :--- |
-| 0 | user clock (input) |
-| 1 | active-low reset (input with pull-up) |
-| 13:2 | `count[11:0]` (outputs) |
-| 62:14 | unused, configured as analog (high impedance) |
+| 48 | user clock (input) |
+| 47 | active-low reset (input with pull-up) |
+| 46 down to 35 | `count[0]` up to `count[11]` (outputs) |
+| all others | unused, configured as analog (high impedance) |
+
+These are the 14 pads of the west edge, next to the frame's power-on and master reset pins. GPIO indices run down that edge (35 at the top, 48 at the bottom).
 
 * `user_proj_counter` (`verilog/rtl/user_proj_counter.v`) is hardened on its own as a macro (`openlane/user_proj_counter/`); its reset is also driven by the frame `porb_l` and `resetb_l`, and reset release is synchronized to the clock.
 * `double_wide_openframe_project_wrapper` places it via a `MACROS` entry in its own `config.json` and configures every pad with [`CF_gpio_config`](verilog/rtl/CF_gpio_config.v) using the per-pad `gpio_loopback_one/zero` constants. This is the same macro+wrapper split `openframe_project_wrapper` uses for `user_proj_timer` and `user_project_wrapper` uses for `user_proj_example`: the wrapper has no standard cells of its own, so it is hardened `SYNTH_ELABORATE_ONLY` and carries only the GPIO-config wiring and the macro instance.

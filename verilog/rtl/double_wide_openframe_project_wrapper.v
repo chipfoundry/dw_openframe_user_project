@@ -26,11 +26,12 @@
  * openlane/double_wide_openframe_project_wrapper/fixed_dont_change/.
  *
  * Example design: user_proj_counter
- *   GPIO 0      clock input
- *   GPIO 1      active-low reset input with pull-up (also reset by porb_l
+ *   GPIO 48     clock input
+ *   GPIO 47     active-low reset input with pull-up (also reset by porb_l
  *               and resetb_l)
- *   GPIO 13:2   count[11:0] outputs
- *   GPIO 62:14  unused (analog / high-impedance)
+ *   GPIO 46:35  count[0] on 46 up to count[11] on 35 (outputs)
+ *   all others  unused (analog / high-impedance)
+ * These are the 14 west-edge pads, beside the frame reset pins.
  */
 
 module double_wide_openframe_project_wrapper (
@@ -58,6 +59,9 @@ module double_wide_openframe_project_wrapper (
     input  resetb_h,    // master reset, sense inverted, 3.3V domain
     input  resetb_l,    // master reset, sense inverted, 1.8V domain
 
+    // User project ID, programmed in the frame's user_id_programming block
+    input  [31:0] mask_rev,
+
     // GPIO data (gpio_in_h is 3.3V domain; everything else is 1.8V)
     input  [62:0] gpio_in,
     input  [62:0] gpio_in_h,
@@ -84,9 +88,15 @@ module double_wide_openframe_project_wrapper (
     inout  [62:0] analog_noesd_io
 );
 
+    // The example uses the 14 pads of the west edge, next to the frame's
+    // power-on and master reset pins. GPIO indices run down that edge, from 35
+    // at the top to 48 at the bottom, and user_proj_counter's pins run up it,
+    // so count[i] is on GPIO COUNT_GPIO0 - i.
     localparam COUNT_WIDTH = 12;
-    localparam COUNT_LSB   = 2;
-    localparam FIRST_UNUSED = COUNT_LSB + COUNT_WIDTH;
+    localparam CLK_GPIO    = 48;
+    localparam RST_GPIO    = 47;
+    localparam COUNT_GPIO0 = 46;                              // count[0]
+    localparam COUNT_GPION = COUNT_GPIO0 - COUNT_WIDTH + 1;   // count[11], GPIO 35
 
     wire                   clk;
     wire                   rst_n;
@@ -124,40 +134,40 @@ module double_wide_openframe_project_wrapper (
         .io_out(),
         .io_in(clk),
         .io_oeb(),
-        .gpio_zero(gpio_loopback_zero[0]),
-        .gpio_one(gpio_loopback_one[0]),
-        .gpio_in(gpio_in[0]),
-        .gpio_dm({gpio_dm2[0], gpio_dm1[0], gpio_dm0[0]}),
-        .gpio_inp_dis(gpio_inp_dis[0]),
-        .gpio_oeb_out(gpio_oeb[0]),
-        .gpio_out_val(gpio_out[0]),
-        .gpio_analog_en(gpio_analog_en[0]),
-        .gpio_analog_sel(gpio_analog_sel[0]),
-        .gpio_analog_pol(gpio_analog_pol[0]),
-        .gpio_ib_mode_sel(gpio_ib_mode_sel[0]),
-        .gpio_vtrip_sel(gpio_vtrip_sel[0]),
-        .gpio_slow_sel(gpio_slow_sel[0]),
-        .gpio_holdover(gpio_holdover[0])
+        .gpio_zero(gpio_loopback_zero[CLK_GPIO]),
+        .gpio_one(gpio_loopback_one[CLK_GPIO]),
+        .gpio_in(gpio_in[CLK_GPIO]),
+        .gpio_dm({gpio_dm2[CLK_GPIO], gpio_dm1[CLK_GPIO], gpio_dm0[CLK_GPIO]}),
+        .gpio_inp_dis(gpio_inp_dis[CLK_GPIO]),
+        .gpio_oeb_out(gpio_oeb[CLK_GPIO]),
+        .gpio_out_val(gpio_out[CLK_GPIO]),
+        .gpio_analog_en(gpio_analog_en[CLK_GPIO]),
+        .gpio_analog_sel(gpio_analog_sel[CLK_GPIO]),
+        .gpio_analog_pol(gpio_analog_pol[CLK_GPIO]),
+        .gpio_ib_mode_sel(gpio_ib_mode_sel[CLK_GPIO]),
+        .gpio_vtrip_sel(gpio_vtrip_sel[CLK_GPIO]),
+        .gpio_slow_sel(gpio_slow_sel[CLK_GPIO]),
+        .gpio_holdover(gpio_holdover[CLK_GPIO])
     );
 
     CF_gpio_config #(.MODE(3'd3)) gpio_rst_config (
         .io_out(),
         .io_in(rst_n),
         .io_oeb(),
-        .gpio_zero(gpio_loopback_zero[1]),
-        .gpio_one(gpio_loopback_one[1]),
-        .gpio_in(gpio_in[1]),
-        .gpio_dm({gpio_dm2[1], gpio_dm1[1], gpio_dm0[1]}),
-        .gpio_inp_dis(gpio_inp_dis[1]),
-        .gpio_oeb_out(gpio_oeb[1]),
-        .gpio_out_val(gpio_out[1]),
-        .gpio_analog_en(gpio_analog_en[1]),
-        .gpio_analog_sel(gpio_analog_sel[1]),
-        .gpio_analog_pol(gpio_analog_pol[1]),
-        .gpio_ib_mode_sel(gpio_ib_mode_sel[1]),
-        .gpio_vtrip_sel(gpio_vtrip_sel[1]),
-        .gpio_slow_sel(gpio_slow_sel[1]),
-        .gpio_holdover(gpio_holdover[1])
+        .gpio_zero(gpio_loopback_zero[RST_GPIO]),
+        .gpio_one(gpio_loopback_one[RST_GPIO]),
+        .gpio_in(gpio_in[RST_GPIO]),
+        .gpio_dm({gpio_dm2[RST_GPIO], gpio_dm1[RST_GPIO], gpio_dm0[RST_GPIO]}),
+        .gpio_inp_dis(gpio_inp_dis[RST_GPIO]),
+        .gpio_oeb_out(gpio_oeb[RST_GPIO]),
+        .gpio_out_val(gpio_out[RST_GPIO]),
+        .gpio_analog_en(gpio_analog_en[RST_GPIO]),
+        .gpio_analog_sel(gpio_analog_sel[RST_GPIO]),
+        .gpio_analog_pol(gpio_analog_pol[RST_GPIO]),
+        .gpio_ib_mode_sel(gpio_ib_mode_sel[RST_GPIO]),
+        .gpio_vtrip_sel(gpio_vtrip_sel[RST_GPIO]),
+        .gpio_slow_sel(gpio_slow_sel[RST_GPIO]),
+        .gpio_holdover(gpio_holdover[RST_GPIO])
     );
 
     genvar i;
@@ -167,43 +177,45 @@ module double_wide_openframe_project_wrapper (
                 .io_out(count[i]),
                 .io_in(),
                 .io_oeb(),
-                .gpio_zero(gpio_loopback_zero[COUNT_LSB + i]),
-                .gpio_one(gpio_loopback_one[COUNT_LSB + i]),
-                .gpio_in(gpio_in[COUNT_LSB + i]),
-                .gpio_dm({gpio_dm2[COUNT_LSB + i], gpio_dm1[COUNT_LSB + i], gpio_dm0[COUNT_LSB + i]}),
-                .gpio_inp_dis(gpio_inp_dis[COUNT_LSB + i]),
-                .gpio_oeb_out(gpio_oeb[COUNT_LSB + i]),
-                .gpio_out_val(gpio_out[COUNT_LSB + i]),
-                .gpio_analog_en(gpio_analog_en[COUNT_LSB + i]),
-                .gpio_analog_sel(gpio_analog_sel[COUNT_LSB + i]),
-                .gpio_analog_pol(gpio_analog_pol[COUNT_LSB + i]),
-                .gpio_ib_mode_sel(gpio_ib_mode_sel[COUNT_LSB + i]),
-                .gpio_vtrip_sel(gpio_vtrip_sel[COUNT_LSB + i]),
-                .gpio_slow_sel(gpio_slow_sel[COUNT_LSB + i]),
-                .gpio_holdover(gpio_holdover[COUNT_LSB + i])
+                .gpio_zero(gpio_loopback_zero[COUNT_GPIO0 - i]),
+                .gpio_one(gpio_loopback_one[COUNT_GPIO0 - i]),
+                .gpio_in(gpio_in[COUNT_GPIO0 - i]),
+                .gpio_dm({gpio_dm2[COUNT_GPIO0 - i], gpio_dm1[COUNT_GPIO0 - i], gpio_dm0[COUNT_GPIO0 - i]}),
+                .gpio_inp_dis(gpio_inp_dis[COUNT_GPIO0 - i]),
+                .gpio_oeb_out(gpio_oeb[COUNT_GPIO0 - i]),
+                .gpio_out_val(gpio_out[COUNT_GPIO0 - i]),
+                .gpio_analog_en(gpio_analog_en[COUNT_GPIO0 - i]),
+                .gpio_analog_sel(gpio_analog_sel[COUNT_GPIO0 - i]),
+                .gpio_analog_pol(gpio_analog_pol[COUNT_GPIO0 - i]),
+                .gpio_ib_mode_sel(gpio_ib_mode_sel[COUNT_GPIO0 - i]),
+                .gpio_vtrip_sel(gpio_vtrip_sel[COUNT_GPIO0 - i]),
+                .gpio_slow_sel(gpio_slow_sel[COUNT_GPIO0 - i]),
+                .gpio_holdover(gpio_holdover[COUNT_GPIO0 - i])
             );
         end
 
-        for (i = FIRST_UNUSED; i < 63; i = i + 1) begin : gpio_unused_config
-            CF_gpio_config #(.MODE(3'd0)) u_cfg (
-                .io_out(),
-                .io_in(),
-                .io_oeb(),
-                .gpio_zero(gpio_loopback_zero[i]),
-                .gpio_one(gpio_loopback_one[i]),
-                .gpio_in(gpio_in[i]),
-                .gpio_dm({gpio_dm2[i], gpio_dm1[i], gpio_dm0[i]}),
-                .gpio_inp_dis(gpio_inp_dis[i]),
-                .gpio_oeb_out(gpio_oeb[i]),
-                .gpio_out_val(gpio_out[i]),
-                .gpio_analog_en(gpio_analog_en[i]),
-                .gpio_analog_sel(gpio_analog_sel[i]),
-                .gpio_analog_pol(gpio_analog_pol[i]),
-                .gpio_ib_mode_sel(gpio_ib_mode_sel[i]),
-                .gpio_vtrip_sel(gpio_vtrip_sel[i]),
-                .gpio_slow_sel(gpio_slow_sel[i]),
-                .gpio_holdover(gpio_holdover[i])
-            );
+        for (i = 0; i < 63; i = i + 1) begin : gpio_unused_config
+            if (i < COUNT_GPION || i > CLK_GPIO) begin : unused
+                CF_gpio_config #(.MODE(3'd0)) u_cfg (
+                    .io_out(),
+                    .io_in(),
+                    .io_oeb(),
+                    .gpio_zero(gpio_loopback_zero[i]),
+                    .gpio_one(gpio_loopback_one[i]),
+                    .gpio_in(gpio_in[i]),
+                    .gpio_dm({gpio_dm2[i], gpio_dm1[i], gpio_dm0[i]}),
+                    .gpio_inp_dis(gpio_inp_dis[i]),
+                    .gpio_oeb_out(gpio_oeb[i]),
+                    .gpio_out_val(gpio_out[i]),
+                    .gpio_analog_en(gpio_analog_en[i]),
+                    .gpio_analog_sel(gpio_analog_sel[i]),
+                    .gpio_analog_pol(gpio_analog_pol[i]),
+                    .gpio_ib_mode_sel(gpio_ib_mode_sel[i]),
+                    .gpio_vtrip_sel(gpio_vtrip_sel[i]),
+                    .gpio_slow_sel(gpio_slow_sel[i]),
+                    .gpio_holdover(gpio_holdover[i])
+                );
+            end
         end
     endgenerate
 

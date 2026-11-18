@@ -54,10 +54,13 @@ are edge pins only, as in OpenFrame.
 
 | GPIO | Role | `CF_gpio_config` mode |
 |------|------|------|
-| 0 | user clock | input |
-| 1 | active-low reset | input with pull-up |
-| 13:2 | `count[11:0]` | output |
-| 62:14 | unused | analog (input buffer off, high impedance) |
+| 48 | user clock | input |
+| 47 | active-low reset | input with pull-up |
+| 46 down to 35 | `count[0]` up to `count[11]` | output |
+| all others | unused | analog (input buffer off, high impedance) |
+
+The example uses the 14 west-edge pads, next to the frame reset pins; GPIO
+indices run down that edge.
 
 `user_proj_counter` is hardened on its own
 (`openlane/user_proj_counter/config.json`) as a dense macro and placed into
