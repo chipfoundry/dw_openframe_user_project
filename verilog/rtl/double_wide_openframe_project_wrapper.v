@@ -23,7 +23,15 @@
  * The module name and port list must stay identical to the harness template
  * (caravel/verilog/rtl/__double_wide_openframe_project_wrapper.v); the pin
  * locations are fixed by
- * openlane/double_wide_openframe_project_wrapper/fixed_dont_change/.
+ * openlane/double_wide_openframe_project_wrapper/pin_template.def.
+ *
+ * The body below is only an example of how to use the wrapper. Replace it
+ * with your own design (docs/your_design.md), and give every one of the 63
+ * pads a CF_gpio_config, including the pads you do not use.
+ *
+ * The vccd1/vssd1 power connection macros (dw_vccd1_connection,
+ * dw_vssd1_connection) are not instantiated here: the hardening flow places
+ * them (docs/power.md).
  *
  * Example design: user_proj_counter
  *   GPIO 48     clock input
@@ -106,10 +114,10 @@ module double_wide_openframe_project_wrapper (
     // openlane/user_proj_counter/) and placed into this wrapper via the
     // MACROS entry in config.json, the same way openframe_project_wrapper
     // places user_proj_timer and user_project_wrapper places
-    // user_proj_example. This instantiation is a blackbox stub for
-    // synthesis (EXTRA_VERILOG_MODELS reads the macro's hardened
-    // gate-level netlist); the wrapper itself is SYNTH_ELABORATE_ONLY and
-    // carries no standard cells of its own.
+    // user_proj_example. For the wrapper's synthesis this instance is a
+    // blackbox (the MACROS entry supplies the macro's hardened gate-level
+    // netlist); the wrapper itself is SYNTH_ELABORATE_ONLY and carries no
+    // standard cells of its own.
     user_proj_counter mprj (
 `ifdef USE_POWER_PINS
         .vccd1(vccd1),
